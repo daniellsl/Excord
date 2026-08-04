@@ -61,6 +61,17 @@
       type: activeServerId ? "channel" : "dm"
     };
 
+    if (activeServerId && !servers.some((server) => server.id === activeServerId)) {
+      servers.unshift({
+        id: activeServerId,
+        name: detectActiveServerName(),
+        href: location.origin + "/channels/" + activeServerId,
+        elementSelector: "",
+        unread: false,
+        mentions: 0
+      });
+    }
+
     return { servers, channels, activeServerId, activeChannel };
   }
 
@@ -215,13 +226,14 @@
   }
 
   function collectServers() {
-    return [...document.querySelectorAll('nav a[href^="/channels/"], [data-list-item-id^="guildsnav___"] a[href^="/channels/"]')]
+    return [...document.querySelectorAll('[data-list-id="guildsnav"] a[href^="/channels/"], [data-list-item-id^="guildsnav___"] a[href^="/channels/"], nav [aria-label*="server" i] a[href^="/channels/"]')]
       .map((anchor, index) => {
-        const match = anchor.getAttribute("href")?.match(/\/channels\/([^/]+)/);
+        const path = new URL(anchor.href, location.origin).pathname;
+        const match = path.match(new RegExp("^/channels/([^/]+)/?$"));
         if (!match || match[1] === "@me") return null;
         return {
           id: match[1],
-          name: readableLabel(anchor) || `Server ${index + 1}`,
+          name: readableServerLabel(anchor) || "Server " + (index + 1),
           href: anchor.href,
           elementSelector: selectorFor(anchor),
           unread: hasUnread(anchor),
@@ -354,9 +366,14 @@
   function detectActiveChatName() {
     return normalizeText(
       document.querySelector('[class*="title"] h1, [data-text-variant="heading-lg/semibold"], h1')?.textContent ||
-        document.title.replace(/\s*\|\s*Discord.*$/, "") ||
+        document.title.replace(new RegExp("\\s*\\|\\s*Discord.*$"), "") ||
         "Active chat"
     );
+  }
+
+  function detectActiveServerName() {
+    const header = document.querySelector('[class*="guildName"], [class*="serverName"], header [class*="name"], nav [aria-current="page"]');
+    return normalizeText(header?.textContent || "Current server");
   }
 
   function pick(root, selectors) {
@@ -369,6 +386,16 @@
 
   function readableLabel(node) {
     return normalizeText(node.getAttribute("aria-label") || node.getAttribute("title") || node.textContent || "");
+  }
+
+  function readableServerLabel(node) {
+    const label = normalizeText(node.getAttribute("aria-label") || node.getAttribute("title") || "");
+    return label
+      .replace(new RegExp("\\s*,?\\s*\\d+\\s+(unread\\s+)?mentions?.*$", "i"), "")
+      .replace(new RegExp("\\s*,?\\s*\\d+\\s+unread.*$", "i"), "")
+      .replace(new RegExp("\\s*,?\\s*selected.*$", "i"), "")
+      .replace(new RegExp("\\s*,?\\s*server.*$", "i"), "")
+      .trim();
   }
 
   function hasUnread(node) {
