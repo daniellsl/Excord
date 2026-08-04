@@ -96,7 +96,9 @@
       await clickAndWait(channel.elementSelector);
       await waitForStableChatList();
       const unreadMarker = await scrollToUnreadMarker();
-      const messages = unreadMarker ? await collectMessagesFromViewport({ unreadOnly: true, marker: unreadMarker }) : [];
+      const messages = unreadMarker
+        ? await collectMessagesFromViewport({ unreadOnly: true, marker: unreadMarker })
+        : await collectMessagesFromViewport({ unreadOnly: false, maxPasses: 8 });
       if (messages.length) {
         grouped[channel.name] = {
           channel,
@@ -168,13 +170,13 @@
     };
   }
 
-  async function collectMessagesFromViewport({ unreadOnly, marker = null }) {
+  async function collectMessagesFromViewport({ unreadOnly, marker = null, maxPasses = 80 }) {
     const scroller = findMessageScroller();
     const messages = new Map();
     let reachedBottom = false;
     let passes = 0;
 
-    while (!reachedBottom && passes < 80) {
+    while (!reachedBottom && passes < maxPasses) {
       await waitWhilePaused();
       if (cancelled) break;
       for (const message of parseVisibleMessages({ marker })) {
@@ -305,8 +307,20 @@
   function findUnreadMarker() {
     const scroller = findMessageScroller();
     if (!scroller) return null;
-    return [...scroller.querySelectorAll('[class*="unread"], [id*="unread"], [role="separator"], div')].find((node) =>
-      /new messages|unread/i.test(`${node.getAttribute("aria-label") || ""} ${node.textContent || ""}`)
+    const candidates = [
+      ...scroller.querySelectorAll('[class*="unread" i], [id*="unread" i], [class*="divider" i], [role="separator"], [aria-label*="new" i], div')
+    ];
+    return candidates.find(isUnreadMarkerNode) || null;
+  }
+
+  function isUnreadMarkerNode(node) {
+    const label = normalizeText(`${node.getAttribute("aria-label") || ""} ${node.getAttribute("title") || ""}`);
+    const text = normalizeText(node.textContent || "");
+    const classText = classNameOf(node);
+    return (
+      /\b(new messages|unread)\b/i.test(`${label} ${text}`) ||
+      (/\bnew\b/i.test(`${label} ${text}`) && /divider|separator|unread/i.test(classText)) ||
+      /isUnread|unreadPill|unreadPillCap|divider.*unread|unread.*divider/i.test(classText)
     );
   }
 
