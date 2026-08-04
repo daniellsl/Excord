@@ -165,22 +165,18 @@ input {
 }
 
 .date-grid {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr;
 }
 
-.date-grid > *,
 .media-grid > * {
   flex: 1;
   min-width: 0;
 }
 
-.date-grid > * {
-  flex-basis: 150px;
-}
-
 .date-grid input[type="datetime-local"] {
   min-width: 0;
-  max-width: 100%;
+  width: 100%;
 }
 
 
