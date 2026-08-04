@@ -51,12 +51,12 @@
           <input id="activeChannel" type="text" readonly value="Detecting active chat..." />
         </label>
         <div class="date-grid">
-          <label>
-            Start date/time
+          <label class="datetime-field">
+            <span class="datetime-label">Start date/time <button id="startToday" class="today-button" type="button">Today</button></span>
             <input id="startDate" type="datetime-local" />
           </label>
-          <label>
-            End date/time
+          <label class="datetime-field">
+            <span class="datetime-label">End date/time <button id="endToday" class="today-button" type="button">Today</button></span>
             <input id="endDate" type="datetime-local" />
           </label>
         </div>

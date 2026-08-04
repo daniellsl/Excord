@@ -22,6 +22,8 @@ const els = {
   activeChannel: document.querySelector("#activeChannel"),
   startDate: document.querySelector("#startDate"),
   endDate: document.querySelector("#endDate"),
+  startToday: document.querySelector("#startToday"),
+  endToday: document.querySelector("#endToday"),
   formatSelect: document.querySelector("#formatSelect"),
   zipOutput: document.querySelector("#zipOutput"),
   downloadMedia: document.querySelector("#downloadMedia"),
@@ -43,6 +45,8 @@ els.refreshContext.addEventListener("click", hydrateContext);
 els.startExport.addEventListener("click", startExport);
 els.pauseExport.addEventListener("click", togglePause);
 els.cancelExport.addEventListener("click", cancelExport);
+els.startToday.addEventListener("click", () => setDateTimeToNow(els.startDate));
+els.endToday.addEventListener("click", () => setDateTimeToNow(els.endDate));
 els.serverSelect.addEventListener("change", async () => {
   state.skipChannelQuery = "";
   els.skipChannelSearch.value = "";
@@ -301,6 +305,10 @@ function renderProgress(progress = {}) {
   if (percent >= 100 || progress.done) {
     setRunning(false);
   }
+}
+
+function setDateTimeToNow(input) {
+  input.value = toDateTimeInput(new Date());
 }
 
 function toDateTimeInput(date) {
