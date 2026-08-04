@@ -87,7 +87,10 @@ async function hydrateContext() {
         .join("")
     : '<option value="">No visible servers detected</option>';
 
-  if (context?.activeServerId) {
+  const activeServerIndex = servers.findIndex((server) => server.id === context?.activeServerId || server.active);
+  if (activeServerIndex >= 0) {
+    els.serverSelect.selectedIndex = activeServerIndex;
+  } else if (context?.activeServerId) {
     els.serverSelect.value = context.activeServerId;
   }
   els.activeChannel.value = context?.activeChannel?.name || "No active channel detected";

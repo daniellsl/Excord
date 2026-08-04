@@ -51,8 +51,8 @@
 
   function getDiscordContext() {
     const path = new URL(location.href).pathname.split("/").filter(Boolean);
-    const activeServerId = path[1] && path[1] !== "@me" ? path[1] : "";
-    const servers = collectServers(activeServerId);
+    const activeServerId = detectActiveServerId();
+    const servers = upsertActiveServer(collectServers(activeServerId), activeServerId);
     const channels = collectVisibleChannels();
     const activeChannelId = path[2] || "";
     const activeChannel = channels.find((channel) => channel.id === activeChannelId) || {
@@ -60,17 +60,6 @@
       name: detectActiveChatName(),
       type: activeServerId ? "channel" : "dm"
     };
-
-    if (activeServerId && !servers.some((server) => server.id === activeServerId)) {
-      servers.unshift({
-        id: activeServerId,
-        name: detectActiveServerName(),
-        href: location.origin + "/channels/" + activeServerId,
-        elementSelector: "",
-        unread: false,
-        mentions: 0
-      });
-    }
 
     return { servers, channels, activeServerId, activeChannel };
   }
@@ -227,6 +216,28 @@
     };
   }
 
+  function detectActiveServerId() {
+    const match = location.pathname.match(new RegExp("^/channels/([^/]+)(?:/|$)"));
+    return match && match[1] !== "@me" ? match[1] : "";
+  }
+
+  function upsertActiveServer(servers, activeServerId) {
+    if (!activeServerId) return servers;
+    const activeName = detectActiveServerName();
+    const existing = servers.find((server) => server.id === activeServerId);
+    const activeServer = {
+      ...(existing || {}),
+      id: activeServerId,
+      name: activeName || existing?.name || "Current server",
+      href: existing?.href || location.origin + "/channels/" + activeServerId,
+      elementSelector: existing?.elementSelector || "",
+      unread: Boolean(existing?.unread),
+      mentions: existing?.mentions || 0,
+      active: true
+    };
+    return [activeServer, ...servers.filter((server) => server.id !== activeServerId)];
+  }
+
   function collectServers(activeServerId = "") {
     return [...document.querySelectorAll('a[href^="/channels/"], a[href^="https://discord.com/channels/"]')]
       .map((anchor, index) => {
@@ -376,8 +387,18 @@
   }
 
   function detectActiveServerName() {
-    const header = document.querySelector('[class*="guildName"], [class*="serverName"], header [class*="name"], nav [aria-current="page"]');
-    return normalizeText(header?.textContent || "Current server");
+    const candidates = [
+      '[class*="sidebar"] header [class*="name"]',
+      '[class*="sidebar"] [class*="guildName"]',
+      '[class*="sidebar"] [class*="serverName"]',
+      '[class*="guildName"]',
+      '[class*="serverName"]'
+    ];
+    for (const selector of candidates) {
+      const value = normalizeText(document.querySelector(selector)?.textContent || "");
+      if (value) return value;
+    }
+    return "Current server";
   }
 
   function pick(root, selectors) {
