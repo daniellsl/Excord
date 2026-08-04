@@ -364,12 +364,19 @@ function finishJob() {
 }
 
 async function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  try {
-    await chrome.downloads.download({ url, filename, saveAs: true, conflictAction: "uniquify" });
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  const url = await blobToDataUrl(blob);
+  await chrome.downloads.download({ url, filename, saveAs: true, conflictAction: "uniquify" });
+}
+
+async function blobToDataUrl(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
   }
+  return `data:${blob.type || "application/octet-stream"};base64,${btoa(binary)}`;
 }
 
 function adaptiveDelay(index) {
