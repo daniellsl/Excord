@@ -75,6 +75,7 @@
     }
     const visibleChannels = collectVisibleChannels();
     const channels = visibleChannels.filter((channel) => {
+      if (channel.muted) return false;
       if (options.unreadScope === "visible") return channel.href;
       return channel.unread || channel.mentions > 0;
     });
@@ -276,6 +277,7 @@
           href: anchor.href,
           type: match[1] === "@me" ? "dm" : "channel",
           elementSelector: selectorFor(anchor),
+          muted: isMuted(anchor),
           unread: hasUnread(anchor),
           mentions: mentionCount(anchor)
         };
@@ -441,7 +443,23 @@
       .trim();
   }
 
+  function isMuted(node) {
+    const row = channelRowFor(node);
+    const classText = [row, ...row.querySelectorAll("*")]
+      .map((item) => item.className || "")
+      .join(" ");
+    const ariaText = [row, ...row.querySelectorAll("[aria-label], [title]")]
+      .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
+      .join(" ");
+
+    return (
+      /(^|\s)(modeMuted|muted|mutedChannel|iconMuted|nameMuted)(\s|$)/i.test(classText) ||
+      /\bmuted\b/i.test(ariaText)
+    );
+  }
+
   function hasUnread(node) {
+    if (isMuted(node)) return false;
     const row = channelRowFor(node);
     const classText = [row, ...row.querySelectorAll("*")]
       .map((item) => item.className || "")
