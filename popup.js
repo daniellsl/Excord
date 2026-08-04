@@ -19,7 +19,6 @@ const els = {
   skipChannelValues: document.querySelector("#skipChannelValues"),
   skipChannelSearch: document.querySelector("#skipChannelSearch"),
   skipChannelMenu: document.querySelector("#skipChannelMenu"),
-  allowReadStateChange: document.querySelector("#allowReadStateChange"),
   activeChannel: document.querySelector("#activeChannel"),
   startDate: document.querySelector("#startDate"),
   endDate: document.querySelector("#endDate"),
@@ -214,17 +213,6 @@ function switchMode(mode) {
 async function startExport() {
   if (!state.tabId) {
     await hydrateContext();
-  }
-
-  if (state.mode === "unread" && !els.allowReadStateChange.checked) {
-    renderProgress({
-      stage: "Server unread export can mark channels as read. Check the read-state warning box to continue.",
-      percent: 0,
-      messages: 0,
-      media: 0,
-      delayMs: 0
-    });
-    return;
   }
 
   const payload = {
