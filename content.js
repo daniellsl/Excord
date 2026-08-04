@@ -96,9 +96,7 @@
       await clickAndWait(channel.elementSelector);
       await waitForStableChatList();
       const unreadMarker = await scrollToUnreadMarker();
-      const messages = unreadMarker
-        ? await collectMessagesFromViewport({ unreadOnly: true, marker: unreadMarker })
-        : await collectMessagesFromViewport({ unreadOnly: false, maxPasses: 8 });
+      const messages = await collectUnreadMessagesToLatest(unreadMarker);
       if (messages.length) {
         grouped[channel.name] = {
           channel,
@@ -168,6 +166,27 @@
       },
       messages: [...messages.values()].sort(compareMessages)
     };
+  }
+
+  async function collectUnreadMessagesToLatest(marker) {
+    const scroller = findMessageScroller();
+    const messages = new Map();
+    let reachedBottom = false;
+    let passes = 0;
+    let filterByMarker = Boolean(marker);
+
+    while (!reachedBottom && passes < 120) {
+      await waitWhilePaused();
+      if (cancelled) break;
+      for (const message of parseVisibleMessages({ marker: filterByMarker ? marker : null })) {
+        if (!filterByMarker || message.isAfterUnreadMarker) messages.set(message.id, message);
+      }
+      reachedBottom = scrollNewer(scroller);
+      passes += 1;
+      filterByMarker = false;
+      await sleep(jitter(passes));
+    }
+    return [...messages.values()].sort(compareMessages);
   }
 
   async function collectMessagesFromViewport({ unreadOnly, marker = null, maxPasses = 80 }) {
