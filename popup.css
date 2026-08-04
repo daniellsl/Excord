@@ -183,21 +183,6 @@ input {
   max-width: 100%;
 }
 
-.datetime-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.today-button {
-  height: 24px;
-  padding: 0 8px;
-  border-color: #4b536f;
-  background: #404761;
-  font-size: 12px;
-  line-height: 1;
-}
 
 .progress-meta {
   justify-content: space-between;

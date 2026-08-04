@@ -22,8 +22,6 @@ const els = {
   activeChannel: document.querySelector("#activeChannel"),
   startDate: document.querySelector("#startDate"),
   endDate: document.querySelector("#endDate"),
-  startToday: document.querySelector("#startToday"),
-  endToday: document.querySelector("#endToday"),
   formatSelect: document.querySelector("#formatSelect"),
   zipOutput: document.querySelector("#zipOutput"),
   downloadMedia: document.querySelector("#downloadMedia"),
@@ -45,8 +43,8 @@ els.refreshContext.addEventListener("click", hydrateContext);
 els.startExport.addEventListener("click", startExport);
 els.pauseExport.addEventListener("click", togglePause);
 els.cancelExport.addEventListener("click", cancelExport);
-els.startToday.addEventListener("click", () => setDateTimeToNow(els.startDate));
-els.endToday.addEventListener("click", () => setDateTimeToNow(els.endDate));
+watchNativeTodaySelection(els.startDate);
+watchNativeTodaySelection(els.endDate);
 els.serverSelect.addEventListener("change", async () => {
   state.skipChannelQuery = "";
   els.skipChannelSearch.value = "";
@@ -307,8 +305,29 @@ function renderProgress(progress = {}) {
   }
 }
 
-function setDateTimeToNow(input) {
-  input.value = toDateTimeInput(new Date());
+function watchNativeTodaySelection(input) {
+  let previousDate = datePart(input.value);
+  input.addEventListener("focus", () => {
+    previousDate = datePart(input.value);
+  });
+  input.addEventListener("pointerdown", () => {
+    previousDate = datePart(input.value);
+  });
+  input.addEventListener("change", () => {
+    const selectedDate = datePart(input.value);
+    if (selectedDate && selectedDate === todayDatePart() && previousDate !== selectedDate) {
+      input.value = toDateTimeInput(new Date());
+    }
+    previousDate = datePart(input.value);
+  });
+}
+
+function datePart(value) {
+  return String(value || "").slice(0, 10);
+}
+
+function todayDatePart() {
+  return toDateTimeInput(new Date()).slice(0, 10);
 }
 
 function toDateTimeInput(date) {
