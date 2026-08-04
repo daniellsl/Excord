@@ -229,8 +229,15 @@
   }
 
   function parseVisibleMessages({ marker = null } = {}) {
-    const nodes = document.querySelectorAll('[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]');
-    return [...nodes].map((node) => parseMessageNode(node, { marker })).filter(Boolean);
+    const nodes = [...document.querySelectorAll('[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]')].filter(isMessageNode);
+    return nodes.map((node) => parseMessageNode(node, { marker })).filter(Boolean);
+  }
+
+  function isMessageNode(node) {
+    return Boolean(
+      node.querySelector('[id^="message-content-"], [id^="message-username-"], time[datetime]') ||
+        node.matches('[id*="chat-messages-"][id*="message-content-"]')
+    );
   }
 
   function parseMessageNode(node, { marker = null } = {}) {
@@ -337,10 +344,18 @@
   }
 
   async function scrollToUnreadMarker() {
-    const marker = findUnreadMarker();
-    if (marker) marker.scrollIntoView({ block: "center" });
-    await sleep(600);
-    return marker;
+    const scroller = findMessageScroller();
+    for (let pass = 0; pass < 50; pass += 1) {
+      const marker = findUnreadMarker();
+      if (marker) {
+        marker.scrollIntoView({ block: "center" });
+        await sleep(700);
+        return findUnreadMarker() || marker;
+      }
+      if (!scrollOlder(scroller)) break;
+      await sleep(jitter(pass));
+    }
+    return null;
   }
 
   function findUnreadMarker() {
@@ -432,10 +447,12 @@
   }
 
   function messageIdForNode(node) {
-    const rawId = node.id || node.getAttribute("data-list-item-id") || "";
     const contentId = node.querySelector('[id^="message-content-"]')?.id || "";
-    const snowflake = `${rawId} ${contentId}`.match(/(\d{15,})/);
-    if (snowflake) return snowflake[1];
+    const contentSnowflake = contentId.match(/message-content-(\d{15,})/);
+    if (contentSnowflake) return contentSnowflake[1];
+    const rawId = node.id || node.getAttribute("data-list-item-id") || "";
+    const snowflakes = `${rawId} ${contentId}`.match(/\d{15,}/g);
+    if (snowflakes?.length) return snowflakes[snowflakes.length - 1];
     const timestamp = node.querySelector("time[datetime]")?.getAttribute("datetime") || "";
     const author = node.querySelector('[class*="username"], h3 span')?.textContent || "";
     const text = node.querySelector('[id^="message-content-"], [class*="messageContent"]')?.textContent || node.textContent || "";
