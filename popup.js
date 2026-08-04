@@ -79,7 +79,12 @@ async function hydrateContext() {
 
   const servers = context?.servers ?? [];
   els.serverSelect.innerHTML = servers.length
-    ? servers.map((server) => `<option value="${escapeAttr(server.id)}">${escapeHtml(server.name)}</option>`).join("")
+    ? servers
+        .map((server) => {
+          const label = server.active ? `${server.name} (current)` : server.name;
+          return `<option value="${escapeAttr(server.id)}">${escapeHtml(label)}</option>`;
+        })
+        .join("")
     : '<option value="">No visible servers detected</option>';
 
   if (context?.activeServerId) {

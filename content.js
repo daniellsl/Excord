@@ -50,10 +50,10 @@
   }
 
   function getDiscordContext() {
-    const servers = collectServers();
-    const channels = collectVisibleChannels();
     const path = new URL(location.href).pathname.split("/").filter(Boolean);
     const activeServerId = path[1] && path[1] !== "@me" ? path[1] : "";
+    const servers = collectServers(activeServerId);
+    const channels = collectVisibleChannels();
     const activeChannelId = path[2] || "";
     const activeChannel = channels.find((channel) => channel.id === activeChannelId) || {
       id: activeChannelId,
@@ -80,8 +80,10 @@
     const targetServer = context.servers.find((server) => server.id === options.serverId) || context.servers[0];
     if (!targetServer) throw new Error("No visible Discord server was detected.");
 
-    await clickAndWait(targetServer.elementSelector);
-    await waitForStableChatList();
+    if (targetServer.elementSelector) {
+      await clickAndWait(targetServer.elementSelector);
+      await waitForStableChatList();
+    }
     const channels = collectVisibleChannels().filter((channel) => {
       if (options.unreadScope === "visible") return channel.href;
       return channel.unread || channel.mentions > 0;
@@ -225,8 +227,8 @@
     };
   }
 
-  function collectServers() {
-    return [...document.querySelectorAll('[data-list-id="guildsnav"] a[href^="/channels/"], [data-list-item-id^="guildsnav___"] a[href^="/channels/"], nav [aria-label*="server" i] a[href^="/channels/"]')]
+  function collectServers(activeServerId = "") {
+    return [...document.querySelectorAll('a[href^="/channels/"], a[href^="https://discord.com/channels/"]')]
       .map((anchor, index) => {
         const path = new URL(anchor.href, location.origin).pathname;
         const match = path.match(new RegExp("^/channels/([^/]+)/?$"));
@@ -237,11 +239,13 @@
           href: anchor.href,
           elementSelector: selectorFor(anchor),
           unread: hasUnread(anchor),
-          mentions: mentionCount(anchor)
+          mentions: mentionCount(anchor),
+          active: match[1] === activeServerId
         };
       })
       .filter(Boolean)
-      .filter((server, index, list) => list.findIndex((item) => item.id === server.id) === index);
+      .filter((server, index, list) => list.findIndex((item) => item.id === server.id) === index)
+      .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
   }
 
   function collectVisibleChannels() {
