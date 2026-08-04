@@ -43,10 +43,10 @@ els.refreshContext.addEventListener("click", hydrateContext);
 els.startExport.addEventListener("click", startExport);
 els.pauseExport.addEventListener("click", togglePause);
 els.cancelExport.addEventListener("click", cancelExport);
-els.serverSelect.addEventListener("change", () => {
-  state.skipChannelIds.clear();
+els.serverSelect.addEventListener("change", async () => {
   state.skipChannelQuery = "";
   els.skipChannelSearch.value = "";
+  await restoreSkipChannelSelection();
   renderSkipChannelPicker();
 });
 els.skipChannelDropdown.addEventListener("click", () => focusSkipChannelSearch());
@@ -119,9 +119,9 @@ async function hydrateContext() {
     els.serverSelect.value = context.activeServerId;
   }
   els.activeChannel.value = context?.activeChannel?.name || "No active channel detected";
-  state.skipChannelIds.clear();
   state.skipChannelQuery = "";
   els.skipChannelSearch.value = "";
+  await restoreSkipChannelSelection();
   renderSkipChannelPicker();
 }
 
@@ -143,6 +143,7 @@ function renderSkipChannelPicker() {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       state.skipChannelIds.delete(button.dataset.removeChannelId);
+      persistSkipChannelSelection();
       renderSkipChannelPicker();
       focusSkipChannelSearch();
     });
@@ -160,12 +161,35 @@ function renderSkipChannelPicker() {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       state.skipChannelIds.add(button.dataset.channelId);
+      persistSkipChannelSelection();
       state.skipChannelQuery = "";
       els.skipChannelSearch.value = "";
       renderSkipChannelPicker();
       focusSkipChannelSearch();
     });
   });
+}
+
+
+async function restoreSkipChannelSelection() {
+  const serverId = els.serverSelect.value;
+  if (!serverId) {
+    state.skipChannelIds.clear();
+    return;
+  }
+  const key = skipChannelStorageKey(serverId);
+  const stored = await chrome.storage.local.get(key).catch(() => ({}));
+  state.skipChannelIds = new Set(Array.isArray(stored[key]) ? stored[key] : []);
+}
+
+async function persistSkipChannelSelection() {
+  const serverId = els.serverSelect.value;
+  if (!serverId) return;
+  await chrome.storage.local.set({ [skipChannelStorageKey(serverId)]: [...state.skipChannelIds] }).catch(() => {});
+}
+
+function skipChannelStorageKey(serverId) {
+  return `skipChannels:${serverId}`;
 }
 
 function currentServerChannels() {
@@ -196,6 +220,7 @@ function handleSkipChannelKeydown(event) {
   if (event.key === "Backspace" && !els.skipChannelSearch.value && state.skipChannelIds.size) {
     const last = [...state.skipChannelIds].at(-1);
     state.skipChannelIds.delete(last);
+    persistSkipChannelSelection();
     renderSkipChannelPicker();
   }
 }
