@@ -15,7 +15,7 @@ Excord is a Manifest V3 Chrome Extension for exporting Discord Web messages from
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
-4. Select `/Users/daniellau/GitHub/Excord`.
+4. Select `/Users/<your-username>/GitHub/Excord`.
 5. Open or refresh `https://discord.com/app`.
 
 After code changes, refresh Excord from `chrome://extensions`.
