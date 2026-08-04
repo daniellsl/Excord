@@ -6,9 +6,21 @@
   "minimum_chrome_version": "114",
   "permissions": ["activeTab", "downloads", "scripting", "storage"],
   "host_permissions": ["https://discord.com/*", "https://cdn.discordapp.com/*", "https://media.discordapp.net/*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_title": "Excord Exporter",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
