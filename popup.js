@@ -306,24 +306,32 @@ function renderProgress(progress = {}) {
 }
 
 function watchNativeTodaySelection(input) {
-  let previousDate = datePart(input.value);
-  input.addEventListener("focus", () => {
-    previousDate = datePart(input.value);
-  });
-  input.addEventListener("pointerdown", () => {
-    previousDate = datePart(input.value);
-  });
-  input.addEventListener("change", () => {
+  let previousValue = input.value;
+  const rememberCurrentValue = () => {
+    previousValue = input.value;
+  };
+  const syncNativeTodayTime = () => {
     const selectedDate = datePart(input.value);
-    if (selectedDate && selectedDate === todayDatePart() && previousDate !== selectedDate) {
+    const previousDate = datePart(previousValue);
+    const keptPreviousTime = timePart(input.value) === timePart(previousValue);
+    if (selectedDate && selectedDate === todayDatePart() && (previousDate !== selectedDate || keptPreviousTime)) {
       input.value = toDateTimeInput(new Date());
     }
-    previousDate = datePart(input.value);
-  });
+    previousValue = input.value;
+  };
+
+  input.addEventListener("focus", rememberCurrentValue);
+  input.addEventListener("pointerdown", rememberCurrentValue);
+  input.addEventListener("input", syncNativeTodayTime);
+  input.addEventListener("change", syncNativeTodayTime);
 }
 
 function datePart(value) {
   return String(value || "").slice(0, 10);
+}
+
+function timePart(value) {
+  return String(value || "").slice(11, 16);
 }
 
 function todayDatePart() {
