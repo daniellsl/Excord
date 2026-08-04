@@ -223,11 +223,9 @@
 
   function findOldestUnreadBoundary(marker) {
     if (!marker || !document.contains(marker)) return null;
-    const candidates = visibleMessageNodes()
-      .filter((node) => isUnreadMessageNode(node, marker))
-      .map((node) => parseMessageNode(node, { marker }))
-      .filter(Boolean);
-    const oldest = candidates.sort(compareMessages)[0];
+    const oldest = parseVisibleMessages({ marker })
+      .filter((message) => message.isAfterUnreadMarker)
+      .sort(compareMessages)[0];
     if (!oldest) return null;
     return {
       timestampMs: Date.parse(oldest.timestamp || ""),
@@ -245,7 +243,10 @@
 
 
   function parseVisibleMessages({ marker = null } = {}) {
-    return visibleMessageNodes().map((node) => parseMessageNode(node, { marker })).filter(Boolean);
+    const authorContext = { author: "Unknown", authorId: "", avatarUrl: "" };
+    return visibleMessageNodes()
+      .map((node) => parseMessageNode(node, { marker, authorContext }))
+      .filter(Boolean);
   }
 
   function visibleMessageNodes() {
@@ -259,7 +260,7 @@
     );
   }
 
-  function parseMessageNode(node, { marker = null } = {}) {
+  function parseMessageNode(node, { marker = null, authorContext = null } = {}) {
     const id = messageIdForNode(node);
     const authorNode = pick(node, ['[class*="username"]', '[data-slate-node="element"] strong', 'h3 span']);
     const timeNode = pick(node, ["time[datetime]", "time"]);
@@ -277,11 +278,24 @@
     const text = normalizeText(contentNode?.innerText || node.querySelector('[class*="markup"]')?.innerText || "");
     if (!text && attachments.length === 0 && !timestamp) return null;
 
+    const explicitAuthor = normalizeText(authorNode?.textContent || "");
+    const explicitAuthorId = extractAuthorId(node);
+    const explicitAvatarUrl = avatar?.src || "";
+    const author = explicitAuthor || authorContext?.author || "Unknown";
+    const authorId = explicitAuthorId || authorContext?.authorId || "";
+    const avatarUrl = explicitAvatarUrl || authorContext?.avatarUrl || "";
+
+    if (authorContext && (explicitAuthor || explicitAuthorId || explicitAvatarUrl)) {
+      authorContext.author = author;
+      authorContext.authorId = authorId;
+      authorContext.avatarUrl = avatarUrl;
+    }
+
     return {
       id,
-      author: normalizeText(authorNode?.textContent || "Unknown"),
-      authorId: extractAuthorId(node),
-      avatarUrl: avatar?.src || "",
+      author,
+      authorId,
+      avatarUrl,
       timestamp,
       text,
       attachments,
