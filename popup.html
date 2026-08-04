@@ -35,6 +35,10 @@
             <option value="visible">All visible channels in selected server</option>
           </select>
         </label>
+        <label>
+          Always skip channels
+          <input id="excludeChannels" type="text" placeholder="abnormal-alert_dasiot, noisy-channel" />
+        </label>
         <div class="warning-box">
           <strong>Read-state warning</strong>
           <span>Server unread export opens each target channel. Discord may mark those channels as read, and Excord cannot reliably restore unread state.</span>

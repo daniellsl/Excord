@@ -74,8 +74,9 @@
       await waitForStableChatList();
     }
     const visibleChannels = collectVisibleChannels();
+    const excludedChannelNames = parseExcludedChannelNames(options.excludeChannels);
     const channels = visibleChannels.filter((channel) => {
-      if (channel.muted) return false;
+      if (channel.muted || excludedChannelNames.has(normalizeChannelName(channel.name))) return false;
       if (options.unreadScope === "visible") return channel.href;
       return channel.unread || channel.mentions > 0;
     });
@@ -444,15 +445,21 @@
   }
 
   function isMuted(node) {
-    const row = channelRowFor(node);
-    const classText = [row, ...row.querySelectorAll("*")]
-      .map((item) => item.className || "")
+    const scope = channelStateScope(node);
+    const classText = scope
+      .flatMap((item) => [item, ...item.querySelectorAll("*")])
+      .map((item) => classNameOf(item))
       .join(" ");
-    const ariaText = [row, ...row.querySelectorAll("[aria-label], [title]")]
+    const ariaText = scope
+      .flatMap((item) => [item, ...item.querySelectorAll("[aria-label], [title]")])
       .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
       .join(" ");
+    const mutedIcon = scope.some((item) =>
+      Boolean(item.querySelector('[aria-label*="muted" i], [class*="muted" i], [class*="modeMuted" i]'))
+    );
 
     return (
+      mutedIcon ||
       /(^|\s)(modeMuted|muted|mutedChannel|iconMuted|nameMuted)(\s|$)/i.test(classText) ||
       /\bmuted\b/i.test(ariaText)
     );
@@ -461,10 +468,13 @@
   function hasUnread(node) {
     if (isMuted(node)) return false;
     const row = channelRowFor(node);
-    const classText = [row, ...row.querySelectorAll("*")]
-      .map((item) => item.className || "")
+    const scope = channelStateScope(node);
+    const classText = scope
+      .flatMap((item) => [item, ...item.querySelectorAll("*")])
+      .map((item) => classNameOf(item))
       .join(" ");
-    const ariaText = [row, ...row.querySelectorAll("[aria-label], [title]")]
+    const ariaText = scope
+      .flatMap((item) => [item, ...item.querySelectorAll("[aria-label], [title]")])
       .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
       .join(" ");
     const visibleText = normalizeText(row.textContent || "");
@@ -496,10 +506,41 @@
 
   function channelRowFor(node) {
     return (
-      node.closest('[data-list-item-id^="channels___"], [class*="containerDefault"], [class*="channel"], li, div[role="treeitem"]') ||
+      node.closest('[data-list-item-id^="channels___"], li, div[role="treeitem"], [class*="containerDefault"]') ||
       node.parentElement ||
       node
     );
+  }
+
+  function channelStateScope(node) {
+    const scope = [];
+    let current = node;
+    for (let depth = 0; current && depth < 7; depth += 1) {
+      scope.push(current);
+      if (current.matches?.('[data-list-item-id^="channels___"], li, div[role="treeitem"], [class*="containerDefault"]')) break;
+      current = current.parentElement;
+    }
+    const row = channelRowFor(node);
+    if (!scope.includes(row)) scope.push(row);
+    return scope;
+  }
+
+  function classNameOf(node) {
+    if (!node?.className) return "";
+    return typeof node.className === "string" ? node.className : node.className.baseVal || String(node.className);
+  }
+
+  function parseExcludedChannelNames(value) {
+    return new Set(
+      String(value || "")
+        .split(/[\n,]+/)
+        .map((name) => normalizeChannelName(name))
+        .filter(Boolean)
+    );
+  }
+
+  function normalizeChannelName(name) {
+    return normalizeText(String(name || "").replace(/#|\(.*?\)/g, "")).toLowerCase();
   }
 
   function selectorFor(node) {
