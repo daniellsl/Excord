@@ -124,9 +124,9 @@
   }
 
   async function extractActiveRange(options) {
-    const start = startOfDay(options.startDate);
-    const end = endOfDay(options.endDate);
-    if (!start || !end || start > end) throw new Error("Choose a valid start and end date.");
+    const start = parseDateTimeInput(options.startDate);
+    const end = parseDateTimeInput(options.endDate);
+    if (!start || !end || start > end) throw new Error("Choose a valid start and end date/time.");
 
     const context = getDiscordContext();
     const messages = new Map();
@@ -162,7 +162,12 @@
       exportKind: "channel-date-range",
       server: context.servers.find((server) => server.id === context.activeServerId) || null,
       activeChat: context.activeChannel,
-      range: { startDate: options.startDate, endDate: options.endDate },
+      range: {
+        startDateTime: options.startDate,
+        endDateTime: options.endDate,
+        startDate: options.startDate,
+        endDate: options.endDate
+      },
       grouped: {
         [context.activeChannel.name]: {
           channel: context.activeChannel,
@@ -500,15 +505,10 @@
     return new Date(Number((snowflake >> 22n) + discordEpoch)).toISOString();
   }
 
-  function startOfDay(value) {
+  function parseDateTimeInput(value) {
     if (!value) return null;
-    const date = new Date(`${value}T00:00:00`);
-    return Number.isFinite(date.getTime()) ? date : null;
-  }
-
-  function endOfDay(value) {
-    if (!value) return null;
-    const date = new Date(`${value}T23:59:59.999`);
+    const normalized = String(value).includes("T") ? String(value) : `${value}T00:00`;
+    const date = new Date(normalized);
     return Number.isFinite(date.getTime()) ? date : null;
   }
 

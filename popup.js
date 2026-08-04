@@ -72,8 +72,8 @@ async function init() {
   const today = new Date();
   const weekAgo = new Date(today);
   weekAgo.setDate(today.getDate() - 7);
-  els.startDate.value = toDateInput(weekAgo);
-  els.endDate.value = toDateInput(today);
+  els.startDate.value = toDateTimeInput(weekAgo);
+  els.endDate.value = toDateTimeInput(today);
   await hydrateContext();
   const job = await chrome.runtime.sendMessage({ type: "EXCORD_GET_JOB" }).catch(() => null);
   if (job?.running) {
@@ -303,8 +303,9 @@ function renderProgress(progress = {}) {
   }
 }
 
-function toDateInput(date) {
-  return date.toISOString().slice(0, 10);
+function toDateTimeInput(date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 }
 
 function escapeHtml(value) {
