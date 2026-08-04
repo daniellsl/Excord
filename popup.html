@@ -35,12 +35,14 @@
             <option value="visible">All visible channels in selected server</option>
           </select>
         </label>
-        <label>
-          Skip channels
-          <select id="skipChannelSelect" multiple size="6">
-            <option value="">Load Discord context to choose channels</option>
-          </select>
-        </label>
+        <div class="field-block">
+          <span class="field-label">Skip channels</span>
+          <div id="skipChannelDropdown" class="multi-search" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+            <div id="skipChannelValues" class="multi-search-values"></div>
+            <input id="skipChannelSearch" class="multi-search-input" type="search" placeholder="Search channels to skip" autocomplete="off" />
+            <div id="skipChannelMenu" class="multi-search-menu" role="listbox"></div>
+          </div>
+        </div>
         <div class="warning-box">
           <strong>Read-state warning</strong>
           <span>Server unread export opens each target channel. Discord may mark those channels as read, and Excord cannot reliably restore unread state.</span>

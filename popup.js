@@ -3,7 +3,9 @@ const state = {
   mode: "unread",
   running: false,
   paused: false,
-  context: null
+  context: null,
+  skipChannelIds: new Set(),
+  skipChannelQuery: ""
 };
 
 const els = {
@@ -13,7 +15,10 @@ const els = {
   panels: [...document.querySelectorAll(".panel")],
   serverSelect: document.querySelector("#serverSelect"),
   unreadChannelSelect: document.querySelector("#unreadChannelSelect"),
-  skipChannelSelect: document.querySelector("#skipChannelSelect"),
+  skipChannelDropdown: document.querySelector("#skipChannelDropdown"),
+  skipChannelValues: document.querySelector("#skipChannelValues"),
+  skipChannelSearch: document.querySelector("#skipChannelSearch"),
+  skipChannelMenu: document.querySelector("#skipChannelMenu"),
   allowReadStateChange: document.querySelector("#allowReadStateChange"),
   activeChannel: document.querySelector("#activeChannel"),
   startDate: document.querySelector("#startDate"),
@@ -39,7 +44,23 @@ els.refreshContext.addEventListener("click", hydrateContext);
 els.startExport.addEventListener("click", startExport);
 els.pauseExport.addEventListener("click", togglePause);
 els.cancelExport.addEventListener("click", cancelExport);
-els.serverSelect.addEventListener("change", renderSkipChannelOptions);
+els.serverSelect.addEventListener("change", () => {
+  state.skipChannelIds.clear();
+  state.skipChannelQuery = "";
+  els.skipChannelSearch.value = "";
+  renderSkipChannelPicker();
+});
+els.skipChannelDropdown.addEventListener("click", () => focusSkipChannelSearch());
+els.skipChannelSearch.addEventListener("focus", () => setSkipMenuOpen(true));
+els.skipChannelSearch.addEventListener("input", () => {
+  state.skipChannelQuery = els.skipChannelSearch.value;
+  renderSkipChannelPicker();
+  setSkipMenuOpen(true);
+});
+els.skipChannelSearch.addEventListener("keydown", handleSkipChannelKeydown);
+document.addEventListener("click", (event) => {
+  if (!els.skipChannelDropdown.contains(event.target)) setSkipMenuOpen(false);
+});
 els.tabs.forEach((tab) => tab.addEventListener("click", () => switchMode(tab.dataset.tab)));
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -99,24 +120,89 @@ async function hydrateContext() {
     els.serverSelect.value = context.activeServerId;
   }
   els.activeChannel.value = context?.activeChannel?.name || "No active channel detected";
-  renderSkipChannelOptions();
+  state.skipChannelIds.clear();
+  state.skipChannelQuery = "";
+  els.skipChannelSearch.value = "";
+  renderSkipChannelPicker();
 }
 
+function renderSkipChannelPicker() {
+  const channels = currentServerChannels();
+  const selected = channels.filter((channel) => state.skipChannelIds.has(channel.id));
+  const query = normalizeSearch(state.skipChannelQuery);
+  const matches = channels
+    .filter((channel) => !state.skipChannelIds.has(channel.id))
+    .filter((channel) => !query || normalizeSearch(channel.name).includes(query))
+    .slice(0, 24);
 
-function renderSkipChannelOptions() {
-  const channels = (state.context?.channels ?? []).filter((channel) => channel.serverId === els.serverSelect.value);
-  els.skipChannelSelect.innerHTML = channels.length
-    ? channels
+  els.skipChannelValues.innerHTML = selected
+    .map(
+      (channel) => `<button class="multi-search-chip" type="button" data-remove-channel-id="${escapeAttr(channel.id)}">${escapeHtml(channel.name)}<span aria-hidden="true">×</span></button>`
+    )
+    .join("");
+  els.skipChannelValues.querySelectorAll("[data-remove-channel-id]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.skipChannelIds.delete(button.dataset.removeChannelId);
+      renderSkipChannelPicker();
+      focusSkipChannelSearch();
+    });
+  });
+
+  els.skipChannelMenu.innerHTML = matches.length
+    ? matches
         .map((channel) => {
-          const label = `${channel.name}${channel.muted ? " (muted)" : ""}`;
-          return `<option value="${escapeAttr(channel.id)}">${escapeHtml(label)}</option>`;
+          const meta = channel.muted ? '<span class="multi-search-meta">Muted</span>' : "";
+          return `<button class="multi-search-item" type="button" role="option" data-channel-id="${escapeAttr(channel.id)}"><span># ${escapeHtml(channel.name)}</span>${meta}</button>`;
         })
         .join("")
-    : '<option value="" disabled>No loaded channels for this server</option>';
+    : `<div class="multi-search-empty">${channels.length ? "No matching channels" : "No loaded channels for this server"}</div>`;
+  els.skipChannelMenu.querySelectorAll("[data-channel-id]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.skipChannelIds.add(button.dataset.channelId);
+      state.skipChannelQuery = "";
+      els.skipChannelSearch.value = "";
+      renderSkipChannelPicker();
+      focusSkipChannelSearch();
+    });
+  });
+}
+
+function currentServerChannels() {
+  return (state.context?.channels ?? [])
+    .filter((channel) => channel.serverId === els.serverSelect.value)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function selectedSkipChannelIds() {
-  return [...els.skipChannelSelect.selectedOptions].map((option) => option.value).filter(Boolean);
+  return [...state.skipChannelIds];
+}
+
+function setSkipMenuOpen(isOpen) {
+  els.skipChannelDropdown.classList.toggle("is-open", isOpen);
+  els.skipChannelDropdown.setAttribute("aria-expanded", String(isOpen));
+}
+
+function focusSkipChannelSearch() {
+  els.skipChannelSearch.focus();
+  setSkipMenuOpen(true);
+}
+
+function handleSkipChannelKeydown(event) {
+  if (event.key === "Escape") {
+    setSkipMenuOpen(false);
+    els.skipChannelSearch.blur();
+  }
+  if (event.key === "Backspace" && !els.skipChannelSearch.value && state.skipChannelIds.size) {
+    const last = [...state.skipChannelIds].at(-1);
+    state.skipChannelIds.delete(last);
+    renderSkipChannelPicker();
+  }
+}
+
+function normalizeSearch(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function switchMode(mode) {
