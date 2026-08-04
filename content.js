@@ -2,14 +2,7 @@
   if (window.__EXCORD_CONTENT_LOADED__) return;
   window.__EXCORD_CONTENT_LOADED__ = true;
 
-  const MSG = {
-    GET_CONTEXT: "EXCORD_GET_CONTEXT",
-    EXTRACT: "EXCORD_EXTRACT",
-    CONTENT_PAUSE: "EXCORD_CONTENT_PAUSE",
-    CONTENT_RESUME: "EXCORD_CONTENT_RESUME",
-    CONTENT_CANCEL: "EXCORD_CONTENT_CANCEL",
-    CONTENT_PROGRESS: "EXCORD_CONTENT_PROGRESS"
-  };
+  const MSG = globalThis.EXCORD_MESSAGES || {};
 
   const SELECTORS = {
     channelLinks: 'a[href^="/channels/"]',

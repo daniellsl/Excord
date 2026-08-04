@@ -1,18 +1,6 @@
-importScripts("vendor/jszip-lite.js");
+importScripts("shared/messages.js", "vendor/jszip-lite.js");
 
-const MSG = {
-  GET_JOB: "EXCORD_GET_JOB",
-  START_EXPORT: "EXCORD_START_EXPORT",
-  PAUSE_EXPORT: "EXCORD_PAUSE_EXPORT",
-  RESUME_EXPORT: "EXCORD_RESUME_EXPORT",
-  CANCEL_EXPORT: "EXCORD_CANCEL_EXPORT",
-  CONTENT_PAUSE: "EXCORD_CONTENT_PAUSE",
-  CONTENT_RESUME: "EXCORD_CONTENT_RESUME",
-  CONTENT_CANCEL: "EXCORD_CONTENT_CANCEL",
-  CONTENT_PROGRESS: "EXCORD_CONTENT_PROGRESS",
-  EXTRACT: "EXCORD_EXTRACT",
-  PROGRESS: "EXCORD_PROGRESS"
-};
+const MSG = globalThis.EXCORD_MESSAGES || {};
 
 const FORMAT_CONFIG = {
   json: { extension: "json", mime: "application/json;charset=utf-8" },

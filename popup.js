@@ -1,12 +1,4 @@
-const MSG = {
-  GET_JOB: "EXCORD_GET_JOB",
-  GET_CONTEXT: "EXCORD_GET_CONTEXT",
-  START_EXPORT: "EXCORD_START_EXPORT",
-  PAUSE_EXPORT: "EXCORD_PAUSE_EXPORT",
-  RESUME_EXPORT: "EXCORD_RESUME_EXPORT",
-  CANCEL_EXPORT: "EXCORD_CANCEL_EXPORT",
-  PROGRESS: "EXCORD_PROGRESS"
-};
+const MSG = globalThis.EXCORD_MESSAGES || {};
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];

@@ -87,6 +87,17 @@ Paste that prompt into an AI agent with your exported CSV or JSON to get:
 - Media downloads use authenticated browser/background fetches where possible, but expired CDN URLs or large files may fail.
 - Author, reply, attachment, and reaction parsing is best-effort because Discord's DOM is not a public export API.
 
+## Architecture Notes
+
+Excord is split by Chrome Extension responsibility:
+
+- `popup.js` owns UI state, form values, progress rendering, and user interactions.
+- `background.js` owns long-running export orchestration, file formatting, ZIP creation, media download, and Chrome downloads.
+- `content.js` owns Discord Web DOM inspection, channel/server detection, scrolling, and message parsing.
+- `shared/messages.js` owns Chrome runtime message names used across scripts. Update this file first when adding a new popup/background/content message.
+
+Keep Discord DOM selectors in `content.js` near the `SELECTORS` constant, and prefer adding parser helpers instead of embedding fragile selectors inside export loops.
+
 ## Project Structure
 
 ```text
@@ -97,6 +108,7 @@ popup.js                      Popup UI state and event handling
 content.js                    Discord Web DOM extraction engine
 background.js                 Export pipeline, formatting, ZIP/media/download handling
 vendor/jszip-lite.js          Local ZIP compression dependency
+shared/messages.js            Cross-script Chrome message constants
 icons/                        Extension icon source and PNG sizes
 docs/discord-analysis-prompt.md  Copy/paste AI analysis prompt
 ```
