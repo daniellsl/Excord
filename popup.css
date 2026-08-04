@@ -15,8 +15,14 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   width: 390px;
+  max-width: 390px;
+  overflow-x: hidden;
+}
+
+body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
@@ -158,9 +164,23 @@ input {
   align-items: start;
 }
 
+.date-grid {
+  flex-wrap: wrap;
+}
+
 .date-grid > *,
 .media-grid > * {
   flex: 1;
+  min-width: 0;
+}
+
+.date-grid > * {
+  flex-basis: 150px;
+}
+
+.date-grid input[type="datetime-local"] {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .progress-meta {
