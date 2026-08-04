@@ -73,10 +73,15 @@
       await clickAndWait(targetServer.elementSelector);
       await waitForStableChatList();
     }
-    const channels = collectVisibleChannels().filter((channel) => {
+    const visibleChannels = collectVisibleChannels();
+    const channels = visibleChannels.filter((channel) => {
       if (options.unreadScope === "visible") return channel.href;
       return channel.unread || channel.mentions > 0;
     });
+
+    if (!channels.length && options.unreadScope !== "visible") {
+      progress(`No unread channels detected among ${visibleChannels.length} visible channels`, 100, 0, 0, 0);
+    }
 
     const grouped = {};
     const allMessages = [];
@@ -285,10 +290,17 @@
   }
 
   async function scrollToUnreadMarker() {
-    const marker = [...document.querySelectorAll('[class*="unread"], [id*="unread"], div')]
-      .find((node) => /new messages|unread/i.test(node.textContent || ""));
+    const marker = findUnreadMarker();
     if (marker) marker.scrollIntoView({ block: "center" });
     await sleep(600);
+  }
+
+  function findUnreadMarker() {
+    const scroller = findMessageScroller();
+    if (!scroller) return null;
+    return [...scroller.querySelectorAll('[class*="unread"], [id*="unread"], [role="separator"], div')].find((node) =>
+      /new messages|unread/i.test(`${node.getAttribute("aria-label") || ""} ${node.textContent || ""}`)
+    );
   }
 
   function scrollOlder(scroller) {
@@ -345,12 +357,18 @@
   }
 
   function isAfterUnreadMarker(node) {
+    const marker = findUnreadMarker();
+    if (!marker) return true;
+    const position = marker.compareDocumentPosition(node);
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return true;
+
     let current = node;
     while (current?.previousElementSibling) {
       current = current.previousElementSibling;
-      if (/new messages|unread/i.test(current.textContent || "")) return true;
+      if (current === marker || current.contains(marker)) return true;
+      if (/new messages|unread/i.test(`${current.getAttribute("aria-label") || ""} ${current.textContent || ""}`)) return true;
     }
-    return !document.body.textContent?.match(/new messages|unread/i);
+    return false;
   }
 
   function extractAuthorId(node) {
@@ -424,13 +442,46 @@
   }
 
   function hasUnread(node) {
-    return Boolean(node.closest('[class*="unread"]') || node.querySelector('[class*="unread"], [class*="pill"]'));
+    const row = channelRowFor(node);
+    const classText = [row, ...row.querySelectorAll("*")]
+      .map((item) => item.className || "")
+      .join(" ");
+    const ariaText = [row, ...row.querySelectorAll("[aria-label], [title]")]
+      .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
+      .join(" ");
+    const visibleText = normalizeText(row.textContent || "");
+    const style = getComputedStyle(node);
+    const weight = Number(style.fontWeight) || 0;
+    const selected = Boolean(
+      node.getAttribute("aria-current") === "page" ||
+        node.getAttribute("aria-selected") === "true" ||
+        row.querySelector('[aria-current="page"], [aria-selected="true"]')
+    );
+
+    return (
+      /(^|\s)(modeUnread|unread|unreadImportant|mentionsBadge|numberBadge|newMessages)(\s|$)/i.test(classText) ||
+      /\b(unread|mention|mentions|new messages)\b/i.test(ariaText) ||
+      /\b\d{1,4}\s+(unread|mentions?)\b/i.test(visibleText) ||
+      (weight >= 600 && !selected)
+    );
   }
 
   function mentionCount(node) {
-    const text = node.textContent || "";
-    const match = text.match(/\b(\d{1,4})\b/);
-    return match ? Number(match[1]) : 0;
+    const row = channelRowFor(node);
+    const text = `${row.textContent || ""} ${row.getAttribute("aria-label") || ""} ${row.getAttribute("title") || ""}`;
+    const mentionMatch = text.match(/(\d{1,4})\s+mentions?/i) || text.match(/mentions?\D+(\d{1,4})/i);
+    if (mentionMatch) return Number(mentionMatch[1]);
+    const badge = row.querySelector('[class*="numberBadge"], [class*="mentionsBadge"], [aria-label*="mention" i]');
+    const badgeMatch = badge?.textContent?.match(/\d{1,4}/);
+    return badgeMatch ? Number(badgeMatch[0]) : 0;
+  }
+
+  function channelRowFor(node) {
+    return (
+      node.closest('[data-list-item-id^="channels___"], [class*="containerDefault"], [class*="channel"], li, div[role="treeitem"]') ||
+      node.parentElement ||
+      node
+    );
   }
 
   function selectorFor(node) {
