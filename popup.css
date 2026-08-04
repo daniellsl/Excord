@@ -9,6 +9,9 @@
   --accent: #5865f2;
   --accent-strong: #7785ff;
   --danger: #da373c;
+  --warning-bg: #3a2f18;
+  --warning-line: #8f6a23;
+  --warning-text: #f0d69a;
 }
 
 * {
@@ -206,4 +209,23 @@ dd {
 
 #cancelExport {
   border-color: #7d2f33;
+}
+
+.warning-box {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--warning-line);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.warning-box strong {
+  color: var(--text);
+}
+
+.warning-box span {
+  color: var(--warning-text);
 }
