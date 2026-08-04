@@ -36,8 +36,10 @@
           </select>
         </label>
         <label>
-          Always skip channels
-          <input id="excludeChannels" type="text" placeholder="abnormal-alert_dasiot, noisy-channel" />
+          Skip channels
+          <select id="skipChannelSelect" multiple size="6">
+            <option value="">Load Discord context to choose channels</option>
+          </select>
         </label>
         <div class="warning-box">
           <strong>Read-state warning</strong>

@@ -74,9 +74,10 @@
       await waitForStableChatList();
     }
     const visibleChannels = collectVisibleChannels();
+    const skippedChannelIds = new Set(options.skipChannelIds || []);
     const excludedChannelNames = parseExcludedChannelNames(options.excludeChannels);
     const channels = visibleChannels.filter((channel) => {
-      if (channel.muted || excludedChannelNames.has(normalizeChannelName(channel.name))) return false;
+      if (channel.muted || skippedChannelIds.has(channel.id) || excludedChannelNames.has(normalizeChannelName(channel.name))) return false;
       if (options.unreadScope === "visible") return channel.href;
       return channel.unread || channel.mentions > 0;
     });

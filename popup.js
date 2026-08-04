@@ -2,7 +2,8 @@ const state = {
   tabId: null,
   mode: "unread",
   running: false,
-  paused: false
+  paused: false,
+  context: null
 };
 
 const els = {
@@ -12,7 +13,7 @@ const els = {
   panels: [...document.querySelectorAll(".panel")],
   serverSelect: document.querySelector("#serverSelect"),
   unreadChannelSelect: document.querySelector("#unreadChannelSelect"),
-  excludeChannels: document.querySelector("#excludeChannels"),
+  skipChannelSelect: document.querySelector("#skipChannelSelect"),
   allowReadStateChange: document.querySelector("#allowReadStateChange"),
   activeChannel: document.querySelector("#activeChannel"),
   startDate: document.querySelector("#startDate"),
@@ -38,6 +39,7 @@ els.refreshContext.addEventListener("click", hydrateContext);
 els.startExport.addEventListener("click", startExport);
 els.pauseExport.addEventListener("click", togglePause);
 els.cancelExport.addEventListener("click", cancelExport);
+els.serverSelect.addEventListener("change", renderSkipChannelOptions);
 els.tabs.forEach((tab) => tab.addEventListener("click", () => switchMode(tab.dataset.tab)));
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -79,6 +81,7 @@ async function hydrateContext() {
     return chrome.tabs.sendMessage(tab.id, { type: "EXCORD_GET_CONTEXT" });
   });
 
+  state.context = context || null;
   const servers = context?.servers ?? [];
   els.serverSelect.innerHTML = servers.length
     ? servers
@@ -96,6 +99,24 @@ async function hydrateContext() {
     els.serverSelect.value = context.activeServerId;
   }
   els.activeChannel.value = context?.activeChannel?.name || "No active channel detected";
+  renderSkipChannelOptions();
+}
+
+
+function renderSkipChannelOptions() {
+  const channels = (state.context?.channels ?? []).filter((channel) => channel.serverId === els.serverSelect.value);
+  els.skipChannelSelect.innerHTML = channels.length
+    ? channels
+        .map((channel) => {
+          const label = `${channel.name}${channel.muted ? " (muted)" : ""}`;
+          return `<option value="${escapeAttr(channel.id)}">${escapeHtml(label)}</option>`;
+        })
+        .join("")
+    : '<option value="" disabled>No loaded channels for this server</option>';
+}
+
+function selectedSkipChannelIds() {
+  return [...els.skipChannelSelect.selectedOptions].map((option) => option.value).filter(Boolean);
 }
 
 function switchMode(mode) {
@@ -125,7 +146,7 @@ async function startExport() {
     mode: state.mode,
     serverId: els.serverSelect.value,
     unreadScope: els.unreadChannelSelect.value,
-    excludeChannels: els.excludeChannels.value,
+    skipChannelIds: selectedSkipChannelIds(),
     startDate: els.startDate.value,
     endDate: els.endDate.value,
     format: els.formatSelect.value,

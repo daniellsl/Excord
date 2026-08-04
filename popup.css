@@ -229,3 +229,12 @@ dd {
 .warning-box span {
   color: var(--warning-text);
 }
+
+#skipChannelSelect {
+  min-height: 132px;
+}
+
+#skipChannelSelect option:checked {
+  background: var(--accent);
+  color: var(--text);
+}
