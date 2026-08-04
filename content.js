@@ -243,9 +243,11 @@
 
 
   function parseVisibleMessages({ marker = null } = {}) {
+    const nodes = visibleMessageNodes();
     const authorContext = { author: "Unknown", authorId: "", avatarUrl: "" };
-    return visibleMessageNodes()
-      .map((node) => parseMessageNode(node, { marker, authorContext }))
+    const identityByAvatar = collectVisibleAuthorIdentities(nodes);
+    return nodes
+      .map((node) => parseMessageNode(node, { marker, authorContext, identityByAvatar }))
       .filter(Boolean);
   }
 
@@ -260,9 +262,9 @@
     );
   }
 
-  function parseMessageNode(node, { marker = null, authorContext = null } = {}) {
+  function parseMessageNode(node, { marker = null, authorContext = null, identityByAvatar = new Map() } = {}) {
     const id = messageIdForNode(node);
-    const authorNode = pick(node, ['[class*="username"]', '[data-slate-node="element"] strong', 'h3 span']);
+    const authorNode = findMessageAuthorNode(node);
     const timeNode = pick(node, ["time[datetime]", "time"]);
     const contentNode = pick(node, ['[id^="message-content-"]', '[class*="messageContent"]']);
     const avatar = pick(node, ['img[class*="avatar"]', 'img[alt*="avatar"]']);
@@ -279,10 +281,11 @@
     if (!text && attachments.length === 0 && !timestamp) return null;
 
     const explicitAuthor = normalizeText(authorNode?.textContent || "");
-    const explicitAuthorId = extractAuthorId(node);
+    const explicitAuthorId = extractAuthorId(authorNode);
     const explicitAvatarUrl = avatar?.src || "";
-    const author = explicitAuthor || authorContext?.author || "Unknown";
-    const authorId = explicitAuthorId || authorContext?.authorId || "";
+    const avatarIdentity = explicitAvatarUrl ? identityByAvatar.get(explicitAvatarUrl) : null;
+    const author = explicitAuthor || avatarIdentity?.author || authorContext?.author || "Unknown";
+    const authorId = explicitAuthorId || avatarIdentity?.authorId || authorContext?.authorId || "";
     const avatarUrl = explicitAvatarUrl || authorContext?.avatarUrl || "";
 
     if (authorContext && (explicitAuthor || explicitAuthorId || explicitAvatarUrl)) {
@@ -509,8 +512,37 @@
     return stableHash(`${timestamp}|${author}|${normalizeText(text)}`);
   }
 
-  function extractAuthorId(node) {
-    const id = node.querySelector(SELECTORS.messageUsername)?.id || "";
+  function collectVisibleAuthorIdentities(nodes) {
+    const identities = new Map();
+    for (const node of nodes) {
+      const authorNode = findMessageAuthorNode(node);
+      const author = normalizeText(authorNode?.textContent || "");
+      const avatarUrl = pick(node, ['img[class*="avatar"]', 'img[alt*="avatar"]'])?.src || "";
+      if (!author || !avatarUrl || identities.has(avatarUrl)) continue;
+      identities.set(avatarUrl, { author, authorId: extractAuthorId(authorNode), avatarUrl });
+    }
+    return identities;
+  }
+
+  function findMessageAuthorNode(node) {
+    return [
+      ...node.querySelectorAll(`${SELECTORS.messageUsername}, [class*="username"], h3 [class*="username"], h3 span`)
+    ].find((candidate) => !isReplyPreviewNode(candidate)) || null;
+  }
+
+  function isReplyPreviewNode(node) {
+    let current = node;
+    while (current && current !== document.body) {
+      const classText = classNameOf(current);
+      if (/repliedMessage|replyBar|replyAvatar|replyBadge|replyContent|threadMessageAccessory|referencedMessage/i.test(classText)) return true;
+      if (current.getAttribute("aria-label")?.match(/reply/i)) return true;
+      current = current.parentElement;
+    }
+    return false;
+  }
+
+  function extractAuthorId(authorNode) {
+    const id = authorNode?.id || authorNode?.closest?.('[id^="message-username-"]')?.id || "";
     return id.match(/(\d{12,})/)?.[1] || "";
   }
 
