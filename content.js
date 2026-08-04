@@ -96,6 +96,11 @@
       await clickAndWait(channel.elementSelector);
       await waitForStableChatList();
       const unreadMarker = await scrollToUnreadMarker();
+      if (!unreadMarker) {
+        progress(`Skipping ${channel.name}: unread marker was not visible`, Math.round((index / Math.max(1, channels.length)) * 45), allMessages.length, 0, 0);
+        await sleep(jitter(index));
+        continue;
+      }
       const messages = await collectUnreadMessagesToLatest(unreadMarker);
       if (messages.length) {
         grouped[channel.name] = {
@@ -191,8 +196,11 @@
   }
 
   function findOldestUnreadBoundary(marker) {
-    const visible = parseVisibleMessages({ marker });
-    const candidates = marker ? visible.filter((message) => message.isAfterUnreadMarker) : visible;
+    if (!marker || !document.contains(marker)) return null;
+    const candidates = visibleMessageNodes()
+      .filter((node) => isUnreadMessageNode(node, marker))
+      .map((node) => parseMessageNode(node, { marker }))
+      .filter(Boolean);
     const oldest = candidates.sort(compareMessages)[0];
     if (!oldest) return null;
     return {
@@ -229,8 +237,11 @@
   }
 
   function parseVisibleMessages({ marker = null } = {}) {
-    const nodes = [...document.querySelectorAll('[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]')].filter(isMessageNode);
-    return nodes.map((node) => parseMessageNode(node, { marker })).filter(Boolean);
+    return visibleMessageNodes().map((node) => parseMessageNode(node, { marker })).filter(Boolean);
+  }
+
+  function visibleMessageNodes() {
+    return [...document.querySelectorAll('[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]')].filter(isMessageNode);
   }
 
   function isMessageNode(node) {
@@ -371,6 +382,11 @@
     const label = normalizeText(`${node.getAttribute("aria-label") || ""} ${node.getAttribute("title") || ""}`);
     const text = normalizeText(node.textContent || "");
     const classText = classNameOf(node);
+    const markerShape =
+      node.getAttribute("role") === "separator" ||
+      /divider|separator|isUnread|unreadPill|unreadPillCap|newMessages/i.test(classText) ||
+      /\bnew messages\b/i.test(label);
+    if (!markerShape) return false;
     return (
       /\b(new messages|unread)\b/i.test(`${label} ${text}`) ||
       (/\bnew\b/i.test(`${label} ${text}`) && /divider|separator|unread/i.test(classText)) ||
@@ -434,16 +450,28 @@
   function isAfterUnreadMarker(node, marker = null) {
     const unreadMarker = marker || findUnreadMarker();
     if (!unreadMarker) return false;
-    const position = unreadMarker.compareDocumentPosition(node);
+    return isUnreadMessageNode(node, unreadMarker);
+  }
+
+  function isUnreadMessageNode(node, marker) {
+    if (!marker || !document.contains(marker)) return false;
+    const position = marker.compareDocumentPosition(node);
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) return false;
     if (position & Node.DOCUMENT_POSITION_FOLLOWING) return true;
 
     let current = node;
     while (current?.previousElementSibling) {
       current = current.previousElementSibling;
-      if (current === unreadMarker || current.contains(unreadMarker)) return true;
-      if (/new messages|unread/i.test(`${current.getAttribute("aria-label") || ""} ${current.textContent || ""}`)) return true;
+      if (current === marker || current.contains(marker)) return true;
     }
-    return false;
+    return isVisuallyBelowMarker(node, marker);
+  }
+
+  function isVisuallyBelowMarker(node, marker) {
+    const markerRect = marker.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    if (!markerRect.height && !nodeRect.height) return false;
+    return nodeRect.top >= markerRect.top - 2 || nodeRect.bottom >= markerRect.bottom - 2;
   }
 
   function messageIdForNode(node) {

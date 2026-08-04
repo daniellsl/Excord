@@ -110,6 +110,8 @@ function prepareExport(extraction, options) {
     ].join("-")
   );
 
+  const messages = sortMessagesForExport(extraction.messages || []).map((message) => ({ ...message }));
+
   return {
     baseName,
     metadata: {
@@ -118,11 +120,11 @@ function prepareExport(extraction, options) {
       server: extraction.server,
       activeChat: extraction.activeChat,
       range: extraction.range || null,
-      messageCount: extraction.messages.length,
+      messageCount: messages.length,
       format: options.format
     },
-    grouped: extraction.grouped,
-    messages: extraction.messages.map((message) => ({ ...message }))
+    grouped: sortGroupedForExport(extraction.grouped || {}),
+    messages
   };
 }
 
@@ -267,6 +269,38 @@ function renderFormat(prepared, format) {
   if (format === "csv") return renderCsv(prepared.messages);
   if (format === "html") return renderHtml(prepared);
   return JSON.stringify({ metadata: prepared.metadata, grouped: prepared.grouped, messages: prepared.messages }, null, 2);
+}
+
+function sortGroupedForExport(grouped) {
+  return Object.entries(grouped)
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .reduce((ordered, [name, group]) => {
+      ordered[name] = {
+        ...group,
+        messages: sortMessagesForExport(group.messages || [])
+      };
+      return ordered;
+    }, {});
+}
+
+function sortMessagesForExport(messages) {
+  return [...messages].sort(compareExportMessages);
+}
+
+function compareExportMessages(a, b) {
+  const channelCompare = String(a.channelName || "").localeCompare(String(b.channelName || ""), undefined, { sensitivity: "base" });
+  if (channelCompare) return channelCompare;
+  const timestampCompare = String(a.timestamp || "").localeCompare(String(b.timestamp || ""));
+  return timestampCompare || compareMessageIds(a.id, b.id);
+}
+
+function compareMessageIds(a, b) {
+  const aText = String(a || "");
+  const bText = String(b || "");
+  const aBig = /^\d+$/.test(aText) ? BigInt(aText) : null;
+  const bBig = /^\d+$/.test(bText) ? BigInt(bText) : null;
+  if (aBig !== null && bBig !== null) return aBig > bBig ? 1 : aBig < bBig ? -1 : 0;
+  return aText.localeCompare(bText);
 }
 
 function renderCsv(messages) {
