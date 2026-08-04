@@ -169,24 +169,44 @@
   }
 
   async function collectUnreadMessagesToLatest(marker) {
+    const boundary = findOldestUnreadBoundary(marker);
+    if (!boundary) return [];
+
     const scroller = findMessageScroller();
     const messages = new Map();
     let reachedBottom = false;
     let passes = 0;
-    let filterByMarker = Boolean(marker);
 
     while (!reachedBottom && passes < 120) {
       await waitWhilePaused();
       if (cancelled) break;
-      for (const message of parseVisibleMessages({ marker: filterByMarker ? marker : null })) {
-        if (!filterByMarker || message.isAfterUnreadMarker) messages.set(message.id, message);
+      for (const message of parseVisibleMessages()) {
+        if (isAtOrAfterBoundary(message, boundary)) messages.set(message.id, message);
       }
       reachedBottom = scrollNewer(scroller);
       passes += 1;
-      filterByMarker = false;
       await sleep(jitter(passes));
     }
     return [...messages.values()].sort(compareMessages);
+  }
+
+  function findOldestUnreadBoundary(marker) {
+    const visible = parseVisibleMessages({ marker });
+    const candidates = marker ? visible.filter((message) => message.isAfterUnreadMarker) : visible;
+    const oldest = candidates.sort(compareMessages)[0];
+    if (!oldest) return null;
+    return {
+      timestampMs: Date.parse(oldest.timestamp || ""),
+      messageId: oldest.id
+    };
+  }
+
+  function isAtOrAfterBoundary(message, boundary) {
+    const messageTime = Date.parse(message.timestamp || "");
+    if (!Number.isFinite(messageTime) || !Number.isFinite(boundary.timestampMs)) return compareMessageIds(message.id, boundary.messageId) >= 0;
+    if (messageTime > boundary.timestampMs) return true;
+    if (messageTime < boundary.timestampMs) return false;
+    return compareMessageIds(message.id, boundary.messageId) >= 0;
   }
 
   async function collectMessagesFromViewport({ unreadOnly, marker = null, maxPasses = 80 }) {
@@ -624,7 +644,15 @@
   }
 
   function compareMessages(a, b) {
-    return String(a.timestamp || "").localeCompare(String(b.timestamp || ""));
+    const timestampCompare = String(a.timestamp || "").localeCompare(String(b.timestamp || ""));
+    return timestampCompare || compareMessageIds(a.id, b.id);
+  }
+
+  function compareMessageIds(a, b) {
+    const aBig = /^\d+$/.test(String(a)) ? BigInt(a) : null;
+    const bBig = /^\d+$/.test(String(b)) ? BigInt(b) : null;
+    if (aBig !== null && bBig !== null) return aBig > bBig ? 1 : aBig < bBig ? -1 : 0;
+    return String(a || "").localeCompare(String(b || ""));
   }
 
   function normalizeText(text) {
