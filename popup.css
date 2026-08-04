@@ -1,0 +1,209 @@
+:root {
+  color-scheme: dark;
+  --bg: #1e1f22;
+  --panel: #2b2d31;
+  --panel-2: #313338;
+  --text: #f2f3f5;
+  --muted: #b5bac1;
+  --line: #3f4147;
+  --accent: #5865f2;
+  --accent-strong: #7785ff;
+  --danger: #da373c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 390px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app {
+  padding: 16px;
+}
+
+.header,
+.progress-meta,
+.actions,
+.stats,
+.media-grid,
+.date-grid {
+  display: flex;
+  gap: 10px;
+}
+
+.header {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+button,
+select,
+input {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+button {
+  height: 34px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  font-weight: 700;
+}
+
+.icon-button {
+  width: 34px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  height: 38px;
+  padding: 0 8px;
+  color: var(--muted);
+}
+
+.tab.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: #394088;
+}
+
+.panel,
+.options,
+.progress-card {
+  display: none;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  margin-bottom: 12px;
+}
+
+.panel.is-active,
+.options,
+.progress-card {
+  display: block;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+select,
+input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
+.check-row input {
+  width: 16px;
+  min-height: 16px;
+}
+
+.compact {
+  margin-top: 23px;
+}
+
+.date-grid,
+.media-grid {
+  align-items: start;
+}
+
+.date-grid > *,
+.media-grid > * {
+  flex: 1;
+}
+
+.progress-meta {
+  justify-content: space-between;
+  color: var(--muted);
+}
+
+.progress-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #111214;
+  margin: 8px 0 12px;
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  transition: width 160ms ease;
+}
+
+.stats {
+  justify-content: space-between;
+}
+
+.stats div {
+  min-width: 88px;
+}
+
+dt {
+  color: var(--muted);
+}
+
+dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+}
+
+.actions button {
+  flex: 1;
+}
+
+#cancelExport {
+  border-color: #7d2f33;
+}

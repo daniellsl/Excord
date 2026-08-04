@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Excord Exporter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div>
+          <h1>Excord</h1>
+          <p id="connectionStatus">Open Discord Web to begin.</p>
+        </div>
+        <button id="refreshContext" class="icon-button" title="Refresh Discord context" type="button">↻</button>
+      </header>
+
+      <nav class="tabs" aria-label="Export mode">
+        <button class="tab is-active" type="button" data-tab="unread">Server Unread Export</button>
+        <button class="tab" type="button" data-tab="range">Channel Date Export</button>
+      </nav>
+
+      <section class="panel is-active" data-panel="unread">
+        <label>
+          Server
+          <select id="serverSelect">
+            <option value="">Detecting servers...</option>
+          </select>
+        </label>
+        <label>
+          Channel scope
+          <select id="unreadChannelSelect">
+            <option value="unread">Unread channels in selected server</option>
+            <option value="visible">All visible channels in selected server</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="panel" data-panel="range">
+        <label>
+          Active Channel or DM
+          <input id="activeChannel" type="text" readonly value="Detecting active chat..." />
+        </label>
+        <div class="date-grid">
+          <label>
+            Start date
+            <input id="startDate" type="date" />
+          </label>
+          <label>
+            End date
+            <input id="endDate" type="date" />
+          </label>
+        </div>
+      </section>
+
+      <section class="options">
+        <label>
+          Export format
+          <select id="formatSelect">
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+            <option value="html">HTML</option>
+          </select>
+        </label>
+        <label class="check-row">
+          <input id="zipOutput" type="checkbox" checked />
+          <span>Package output and attachments into a .ZIP archive</span>
+        </label>
+        <label class="check-row">
+          <input id="downloadMedia" type="checkbox" checked />
+          <span>Download media attachments</span>
+        </label>
+        <div class="media-grid">
+          <label>
+            Max media size
+            <select id="maxMediaSize">
+              <option value="5242880">5 MB</option>
+              <option value="10485760" selected>10 MB</option>
+              <option value="26214400">25 MB</option>
+              <option value="52428800">50 MB</option>
+            </select>
+          </label>
+          <label class="check-row compact">
+            <input id="imagesOnly" type="checkbox" />
+            <span>Images only</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="progress-card" aria-live="polite">
+        <div class="progress-meta">
+          <span id="statusText">Idle</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <dl class="stats">
+          <div><dt>Messages</dt><dd id="messageCount">0</dd></div>
+          <div><dt>Media</dt><dd id="mediaCount">0</dd></div>
+          <div><dt>Delay</dt><dd id="delayStatus">0s</dd></div>
+        </dl>
+      </section>
+
+      <footer class="actions">
+        <button id="startExport" class="primary" type="button">Start Export</button>
+        <button id="pauseExport" type="button" disabled>Pause</button>
+        <button id="cancelExport" type="button" disabled>Cancel</button>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

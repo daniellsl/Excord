@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Excord Discord Exporter",
+  "description": "Export Discord Web message history to JSON, CSV, or offline HTML with optional media ZIP packaging.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "114",
+  "permissions": ["activeTab", "downloads", "scripting", "storage"],
+  "host_permissions": ["https://discord.com/*", "https://cdn.discordapp.com/*", "https://media.discordapp.net/*"],
+  "action": {
+    "default_title": "Excord Exporter",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://discord.com/app*", "https://discord.com/channels/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["vendor/jszip-lite.js"],
+      "matches": ["https://discord.com/*"]
+    }
+  ]
+}
