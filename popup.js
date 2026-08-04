@@ -1,3 +1,16 @@
+const MSG = {
+  GET_JOB: "EXCORD_GET_JOB",
+  GET_CONTEXT: "EXCORD_GET_CONTEXT",
+  START_EXPORT: "EXCORD_START_EXPORT",
+  PAUSE_EXPORT: "EXCORD_PAUSE_EXPORT",
+  RESUME_EXPORT: "EXCORD_RESUME_EXPORT",
+  CANCEL_EXPORT: "EXCORD_CANCEL_EXPORT",
+  PROGRESS: "EXCORD_PROGRESS"
+};
+
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+
 const state = {
   tabId: null,
   mode: "unread",
@@ -9,33 +22,33 @@ const state = {
 };
 
 const els = {
-  connectionStatus: document.querySelector("#connectionStatus"),
-  refreshContext: document.querySelector("#refreshContext"),
-  tabs: [...document.querySelectorAll(".tab")],
-  panels: [...document.querySelectorAll(".panel")],
-  serverSelect: document.querySelector("#serverSelect"),
-  unreadChannelSelect: document.querySelector("#unreadChannelSelect"),
-  skipChannelDropdown: document.querySelector("#skipChannelDropdown"),
-  skipChannelValues: document.querySelector("#skipChannelValues"),
-  skipChannelSearch: document.querySelector("#skipChannelSearch"),
-  skipChannelMenu: document.querySelector("#skipChannelMenu"),
-  activeChannel: document.querySelector("#activeChannel"),
-  startDate: document.querySelector("#startDate"),
-  endDate: document.querySelector("#endDate"),
-  formatSelect: document.querySelector("#formatSelect"),
-  zipOutput: document.querySelector("#zipOutput"),
-  downloadMedia: document.querySelector("#downloadMedia"),
-  maxMediaSize: document.querySelector("#maxMediaSize"),
-  imagesOnly: document.querySelector("#imagesOnly"),
-  statusText: document.querySelector("#statusText"),
-  progressPercent: document.querySelector("#progressPercent"),
-  progressFill: document.querySelector("#progressFill"),
-  messageCount: document.querySelector("#messageCount"),
-  mediaCount: document.querySelector("#mediaCount"),
-  delayStatus: document.querySelector("#delayStatus"),
-  startExport: document.querySelector("#startExport"),
-  pauseExport: document.querySelector("#pauseExport"),
-  cancelExport: document.querySelector("#cancelExport")
+  connectionStatus: $("#connectionStatus"),
+  refreshContext: $("#refreshContext"),
+  tabs: $$(".tab"),
+  panels: $$(".panel"),
+  serverSelect: $("#serverSelect"),
+  unreadChannelSelect: $("#unreadChannelSelect"),
+  skipChannelDropdown: $("#skipChannelDropdown"),
+  skipChannelValues: $("#skipChannelValues"),
+  skipChannelSearch: $("#skipChannelSearch"),
+  skipChannelMenu: $("#skipChannelMenu"),
+  activeChannel: $("#activeChannel"),
+  startDate: $("#startDate"),
+  endDate: $("#endDate"),
+  formatSelect: $("#formatSelect"),
+  zipOutput: $("#zipOutput"),
+  downloadMedia: $("#downloadMedia"),
+  maxMediaSize: $("#maxMediaSize"),
+  imagesOnly: $("#imagesOnly"),
+  statusText: $("#statusText"),
+  progressPercent: $("#progressPercent"),
+  progressFill: $("#progressFill"),
+  messageCount: $("#messageCount"),
+  mediaCount: $("#mediaCount"),
+  delayStatus: $("#delayStatus"),
+  startExport: $("#startExport"),
+  pauseExport: $("#pauseExport"),
+  cancelExport: $("#cancelExport")
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -46,8 +59,7 @@ els.cancelExport.addEventListener("click", cancelExport);
 watchNativeTodaySelection(els.startDate);
 watchNativeTodaySelection(els.endDate);
 els.serverSelect.addEventListener("change", async () => {
-  state.skipChannelQuery = "";
-  els.skipChannelSearch.value = "";
+  resetSkipChannelSearch();
   await restoreSkipChannelSelection();
   renderSkipChannelPicker();
 });
@@ -65,7 +77,7 @@ document.addEventListener("click", (event) => {
 els.tabs.forEach((tab) => tab.addEventListener("click", () => switchMode(tab.dataset.tab)));
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (message?.type === "EXCORD_PROGRESS") {
+  if (message?.type === MSG.PROGRESS) {
     renderProgress(message.payload);
   }
 });
@@ -77,7 +89,7 @@ async function init() {
   els.startDate.value = toDateTimeInput(weekAgo);
   els.endDate.value = toDateTimeInput(today);
   await hydrateContext();
-  const job = await chrome.runtime.sendMessage({ type: "EXCORD_GET_JOB" }).catch(() => null);
+  const job = await chrome.runtime.sendMessage({ type: MSG.GET_JOB }).catch(() => null);
   if (job?.running) {
     state.running = true;
     state.paused = Boolean(job.paused);
@@ -98,9 +110,9 @@ async function hydrateContext() {
   }
 
   els.connectionStatus.textContent = "Connected to Discord Web.";
-  const context = await chrome.tabs.sendMessage(tab.id, { type: "EXCORD_GET_CONTEXT" }).catch(async () => {
+  const context = await chrome.tabs.sendMessage(tab.id, { type: MSG.GET_CONTEXT }).catch(async () => {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-    return chrome.tabs.sendMessage(tab.id, { type: "EXCORD_GET_CONTEXT" });
+    return chrome.tabs.sendMessage(tab.id, { type: MSG.GET_CONTEXT });
   });
 
   state.context = context || null;
@@ -121,8 +133,7 @@ async function hydrateContext() {
     els.serverSelect.value = context.activeServerId;
   }
   els.activeChannel.value = context?.activeChannel?.name || "No active channel detected";
-  state.skipChannelQuery = "";
-  els.skipChannelSearch.value = "";
+  resetSkipChannelSearch();
   await restoreSkipChannelSelection();
   renderSkipChannelPicker();
 }
@@ -164,14 +175,17 @@ function renderSkipChannelPicker() {
       event.stopPropagation();
       state.skipChannelIds.add(button.dataset.channelId);
       persistSkipChannelSelection();
-      state.skipChannelQuery = "";
-      els.skipChannelSearch.value = "";
+      resetSkipChannelSearch();
       renderSkipChannelPicker();
       focusSkipChannelSearch();
     });
   });
 }
 
+function resetSkipChannelSearch() {
+  state.skipChannelQuery = "";
+  els.skipChannelSearch.value = "";
+}
 
 async function restoreSkipChannelSelection() {
   const serverId = els.serverSelect.value;
@@ -259,7 +273,7 @@ async function startExport() {
 
   setRunning(true);
   renderProgress({ stage: "Starting export", percent: 2, messages: 0, media: 0, delayMs: 0 });
-  const response = await chrome.runtime.sendMessage({ type: "EXCORD_START_EXPORT", payload }).catch((error) => ({
+  const response = await chrome.runtime.sendMessage({ type: MSG.START_EXPORT, payload }).catch((error) => ({
     ok: false,
     error: error.message
   }));
@@ -273,11 +287,11 @@ async function startExport() {
 async function togglePause() {
   state.paused = !state.paused;
   els.pauseExport.textContent = state.paused ? "Resume" : "Pause";
-  await chrome.runtime.sendMessage({ type: state.paused ? "EXCORD_PAUSE_EXPORT" : "EXCORD_RESUME_EXPORT" });
+  await chrome.runtime.sendMessage({ type: state.paused ? MSG.PAUSE_EXPORT : MSG.RESUME_EXPORT });
 }
 
 async function cancelExport() {
-  await chrome.runtime.sendMessage({ type: "EXCORD_CANCEL_EXPORT" });
+  await chrome.runtime.sendMessage({ type: MSG.CANCEL_EXPORT });
   setRunning(false);
   renderProgress({ stage: "Cancelled", percent: 0, messages: 0, media: 0, delayMs: 0 });
 }

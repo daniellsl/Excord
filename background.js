@@ -1,5 +1,25 @@
 importScripts("vendor/jszip-lite.js");
 
+const MSG = {
+  GET_JOB: "EXCORD_GET_JOB",
+  START_EXPORT: "EXCORD_START_EXPORT",
+  PAUSE_EXPORT: "EXCORD_PAUSE_EXPORT",
+  RESUME_EXPORT: "EXCORD_RESUME_EXPORT",
+  CANCEL_EXPORT: "EXCORD_CANCEL_EXPORT",
+  CONTENT_PAUSE: "EXCORD_CONTENT_PAUSE",
+  CONTENT_RESUME: "EXCORD_CONTENT_RESUME",
+  CONTENT_CANCEL: "EXCORD_CONTENT_CANCEL",
+  CONTENT_PROGRESS: "EXCORD_CONTENT_PROGRESS",
+  EXTRACT: "EXCORD_EXTRACT",
+  PROGRESS: "EXCORD_PROGRESS"
+};
+
+const FORMAT_CONFIG = {
+  json: { extension: "json", mime: "application/json;charset=utf-8" },
+  csv: { extension: "csv", mime: "text/csv;charset=utf-8" },
+  html: { extension: "html", mime: "text/html;charset=utf-8" }
+};
+
 const job = {
   running: false,
   paused: false,
@@ -9,12 +29,12 @@ const job = {
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "EXCORD_GET_JOB") {
+  if (message?.type === MSG.GET_JOB) {
     sendResponse({ running: job.running, paused: job.paused, progress: job.progress });
     return false;
   }
 
-  if (message?.type === "EXCORD_START_EXPORT") {
+  if (message?.type === MSG.START_EXPORT) {
     startExport(message.payload).then(sendResponse).catch((error) => {
       updateProgress({ stage: error.message, percent: 0 });
       finishJob();
@@ -23,30 +43,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === "EXCORD_PAUSE_EXPORT") {
+  if (message?.type === MSG.PAUSE_EXPORT) {
     job.paused = true;
-    if (job.tabId) chrome.tabs.sendMessage(job.tabId, { type: "EXCORD_CONTENT_PAUSE" }).catch(() => {});
+    sendContentCommand(MSG.CONTENT_PAUSE);
     sendResponse({ ok: true });
     return false;
   }
 
-  if (message?.type === "EXCORD_RESUME_EXPORT") {
+  if (message?.type === MSG.RESUME_EXPORT) {
     job.paused = false;
-    if (job.tabId) chrome.tabs.sendMessage(job.tabId, { type: "EXCORD_CONTENT_RESUME" }).catch(() => {});
+    sendContentCommand(MSG.CONTENT_RESUME);
     sendResponse({ ok: true });
     return false;
   }
 
-  if (message?.type === "EXCORD_CANCEL_EXPORT") {
+  if (message?.type === MSG.CANCEL_EXPORT) {
     job.cancelled = true;
     job.paused = false;
-    if (job.tabId) chrome.tabs.sendMessage(job.tabId, { type: "EXCORD_CONTENT_CANCEL" }).catch(() => {});
+    sendContentCommand(MSG.CONTENT_CANCEL);
     finishJob();
     sendResponse({ ok: true });
     return false;
   }
 
-  if (message?.type === "EXCORD_CONTENT_PROGRESS") {
+  if (message?.type === MSG.CONTENT_PROGRESS) {
     updateProgress(message.payload);
     sendResponse({ ok: true });
     return false;
@@ -69,7 +89,7 @@ async function startExport(options) {
   broadcast();
 
   try {
-    const extraction = await chrome.tabs.sendMessage(options.tabId, { type: "EXCORD_EXTRACT", payload: options });
+    const extraction = await chrome.tabs.sendMessage(options.tabId, { type: MSG.EXTRACT, payload: options });
     if (!extraction?.ok) throw new Error(extraction?.error || "Discord extraction failed.");
     if (job.cancelled) return { ok: false, error: "Export cancelled." };
 
@@ -234,8 +254,8 @@ async function responseToLimitedBlob(response, maxBytes, filename) {
 
 async function savePreparedExport(prepared, options) {
   const exportText = renderFormat(prepared, options.format);
-  const extension = options.format === "html" ? "html" : options.format;
-  const logPath = `logs/${prepared.baseName}.${extension}`;
+  const formatConfig = formatConfigFor(options.format);
+  const logPath = `logs/${prepared.baseName}.${formatConfig.extension}`;
   const manifestText = JSON.stringify(
     {
       ...prepared.metadata,
@@ -262,7 +282,7 @@ async function savePreparedExport(prepared, options) {
     return;
   }
 
-  await downloadBlob(new Blob([exportText], { type: mimeFor(options.format) }), `${prepared.baseName}.${extension}`);
+  await downloadBlob(new Blob([exportText], { type: formatConfig.mime }), `${prepared.baseName}.${formatConfig.extension}`);
 }
 
 function renderFormat(prepared, format) {
@@ -388,7 +408,11 @@ function updateProgress(patch) {
 }
 
 function broadcast() {
-  chrome.runtime.sendMessage({ type: "EXCORD_PROGRESS", payload: job.progress }).catch(() => {});
+  chrome.runtime.sendMessage({ type: MSG.PROGRESS, payload: job.progress }).catch(() => {});
+}
+
+function sendContentCommand(type) {
+  if (job.tabId) chrome.tabs.sendMessage(job.tabId, { type }).catch(() => {});
 }
 
 function finishJob() {
@@ -469,10 +493,8 @@ function csvCell(value) {
   return `"${String(value).replace(/"/g, '""')}"`;
 }
 
-function mimeFor(format) {
-  if (format === "html") return "text/html;charset=utf-8";
-  if (format === "csv") return "text/csv;charset=utf-8";
-  return "application/json;charset=utf-8";
+function formatConfigFor(format) {
+  return FORMAT_CONFIG[format] || FORMAT_CONFIG.json;
 }
 
 function linkify(html) {

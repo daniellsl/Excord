@@ -2,17 +2,38 @@
   if (window.__EXCORD_CONTENT_LOADED__) return;
   window.__EXCORD_CONTENT_LOADED__ = true;
 
+  const MSG = {
+    GET_CONTEXT: "EXCORD_GET_CONTEXT",
+    EXTRACT: "EXCORD_EXTRACT",
+    CONTENT_PAUSE: "EXCORD_CONTENT_PAUSE",
+    CONTENT_RESUME: "EXCORD_CONTENT_RESUME",
+    CONTENT_CANCEL: "EXCORD_CONTENT_CANCEL",
+    CONTENT_PROGRESS: "EXCORD_CONTENT_PROGRESS"
+  };
+
+  const SELECTORS = {
+    channelLinks: 'a[href^="/channels/"]',
+    guildLinks: 'a[href^="/channels/"], a[href^="https://discord.com/channels/"]',
+    messageList: '[data-list-id="chat-messages"], ol[data-list-id="chat-messages"]',
+    messageNode: '[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]',
+    messageReady: '[id^="chat-messages-"], [data-list-id="chat-messages"]',
+    messageContent: '[id^="message-content-"]',
+    messageContentOrMarkup: '[id^="message-content-"], [class*="messageContent"]',
+    messageUsername: '[id^="message-username-"]',
+    unreadMarkerCandidate: '[class*="unread" i], [id*="unread" i], [class*="divider" i], [role="separator"], [aria-label*="new" i], div'
+  };
+
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let cancelled = false;
   let paused = false;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "EXCORD_GET_CONTEXT") {
+    if (message?.type === MSG.GET_CONTEXT) {
       sendResponse(getDiscordContext());
       return false;
     }
 
-    if (message?.type === "EXCORD_EXTRACT") {
+    if (message?.type === MSG.EXTRACT) {
       cancelled = false;
       paused = false;
       runExtraction(message.payload).then(sendResponse).catch((error) => {
@@ -21,19 +42,19 @@
       return true;
     }
 
-    if (message?.type === "EXCORD_CONTENT_PAUSE") {
+    if (message?.type === MSG.CONTENT_PAUSE) {
       paused = true;
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message?.type === "EXCORD_CONTENT_RESUME") {
+    if (message?.type === MSG.CONTENT_RESUME) {
       paused = false;
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message?.type === "EXCORD_CONTENT_CANCEL") {
+    if (message?.type === MSG.CONTENT_CANCEL) {
       cancelled = true;
       sendResponse({ ok: true });
       return false;
@@ -222,31 +243,13 @@
     return compareMessageIds(message.id, boundary.messageId) >= 0;
   }
 
-  async function collectMessagesFromViewport({ unreadOnly, marker = null, maxPasses = 80 }) {
-    const scroller = findMessageScroller();
-    const messages = new Map();
-    let reachedBottom = false;
-    let passes = 0;
-
-    while (!reachedBottom && passes < maxPasses) {
-      await waitWhilePaused();
-      if (cancelled) break;
-      for (const message of parseVisibleMessages({ marker })) {
-        if (!unreadOnly || message.isAfterUnreadMarker) messages.set(message.id, message);
-      }
-      reachedBottom = scrollNewer(scroller);
-      passes += 1;
-      await sleep(jitter(passes));
-    }
-    return [...messages.values()].sort(compareMessages);
-  }
 
   function parseVisibleMessages({ marker = null } = {}) {
     return visibleMessageNodes().map((node) => parseMessageNode(node, { marker })).filter(Boolean);
   }
 
   function visibleMessageNodes() {
-    return [...document.querySelectorAll('[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]')].filter(isMessageNode);
+    return [...document.querySelectorAll(SELECTORS.messageNode)].filter(isMessageNode);
   }
 
   function isMessageNode(node) {
@@ -313,7 +316,7 @@
   }
 
   function collectServers(activeServerId = "") {
-    return [...document.querySelectorAll('a[href^="/channels/"], a[href^="https://discord.com/channels/"]')]
+    return [...document.querySelectorAll(SELECTORS.guildLinks)]
       .map((anchor, index) => {
         const path = new URL(anchor.href, location.origin).pathname;
         const match = path.match(new RegExp("^/channels/([^/]+)/?$"));
@@ -334,7 +337,7 @@
   }
 
   function collectVisibleChannels() {
-    return [...document.querySelectorAll('a[href^="/channels/"]')]
+    return [...document.querySelectorAll(SELECTORS.channelLinks)]
       .map((anchor, index) => {
         const match = anchor.getAttribute("href")?.match(/\/channels\/([^/]+)\/([^/]+)/);
         if (!match) return null;
@@ -355,7 +358,7 @@
   }
 
   function findMessageScroller() {
-    const list = document.querySelector('[data-list-id="chat-messages"], ol[data-list-id="chat-messages"]');
+    const list = document.querySelector(SELECTORS.messageList);
     return list?.closest('[class*="scroller"]') || list?.parentElement || document.scrollingElement;
   }
 
@@ -378,7 +381,7 @@
     const scroller = findMessageScroller();
     if (!scroller) return null;
     const candidates = [
-      ...scroller.querySelectorAll('[class*="unread" i], [id*="unread" i], [class*="divider" i], [role="separator"], [aria-label*="new" i], div')
+      ...scroller.querySelectorAll(SELECTORS.unreadMarkerCandidate)
     ];
     return candidates.find(isUnreadMarkerNode) || null;
   }
@@ -422,7 +425,7 @@
 
   async function waitForStableChatList() {
     for (let index = 0; index < 20; index += 1) {
-      if (findMessageScroller() && document.querySelector('[id^="chat-messages-"], [data-list-id="chat-messages"]')) return;
+      if (findMessageScroller() && document.querySelector(SELECTORS.messageReady)) return;
       await sleep(250);
     }
   }
@@ -432,7 +435,7 @@
   }
 
   function progress(stage, percent, messages, media, delayMs) {
-    chrome.runtime.sendMessage({ type: "EXCORD_CONTENT_PROGRESS", payload: { stage, percent, messages, media, delayMs } }).catch(() => {});
+    chrome.runtime.sendMessage({ type: MSG.CONTENT_PROGRESS, payload: { stage, percent, messages, media, delayMs } }).catch(() => {});
   }
 
   function attachmentFromNode(node) {
@@ -480,7 +483,7 @@
   }
 
   function messageIdForNode(node) {
-    const contentId = node.querySelector('[id^="message-content-"]')?.id || "";
+    const contentId = node.querySelector(SELECTORS.messageContent)?.id || "";
     const contentSnowflake = contentId.match(/message-content-(\d{15,})/);
     if (contentSnowflake) return contentSnowflake[1];
     const rawId = node.id || node.getAttribute("data-list-item-id") || "";
@@ -488,12 +491,12 @@
     if (snowflakes?.length) return snowflakes[snowflakes.length - 1];
     const timestamp = node.querySelector("time[datetime]")?.getAttribute("datetime") || "";
     const author = node.querySelector('[class*="username"], h3 span')?.textContent || "";
-    const text = node.querySelector('[id^="message-content-"], [class*="messageContent"]')?.textContent || node.textContent || "";
+    const text = node.querySelector(SELECTORS.messageContentOrMarkup)?.textContent || node.textContent || "";
     return stableHash(`${timestamp}|${author}|${normalizeText(text)}`);
   }
 
   function extractAuthorId(node) {
-    const id = node.querySelector('[id^="message-username-"]')?.id || "";
+    const id = node.querySelector(SELECTORS.messageUsername)?.id || "";
     return id.match(/(\d{12,})/)?.[1] || "";
   }
 
@@ -559,37 +562,22 @@
 
   function isMuted(node) {
     const scope = channelStateScope(node);
-    const classText = scope
-      .flatMap((item) => [item, ...item.querySelectorAll("*")])
-      .map((item) => classNameOf(item))
-      .join(" ");
-    const ariaText = scope
-      .flatMap((item) => [item, ...item.querySelectorAll("[aria-label], [title]")])
-      .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
-      .join(" ");
+    const stateText = channelStateText(scope);
     const mutedIcon = scope.some((item) =>
       Boolean(item.querySelector('[aria-label*="muted" i], [class*="muted" i], [class*="modeMuted" i]'))
     );
 
     return (
       mutedIcon ||
-      /(^|\s)(modeMuted|muted|mutedChannel|iconMuted|nameMuted)(\s|$)/i.test(classText) ||
-      /\bmuted\b/i.test(ariaText)
+      /(^|\s)(modeMuted|muted|mutedChannel|iconMuted|nameMuted)(\s|$)/i.test(stateText.classText) ||
+      /\bmuted\b/i.test(stateText.ariaText)
     );
   }
 
   function hasUnread(node) {
     if (isMuted(node)) return false;
     const row = channelRowFor(node);
-    const scope = channelStateScope(node);
-    const classText = scope
-      .flatMap((item) => [item, ...item.querySelectorAll("*")])
-      .map((item) => classNameOf(item))
-      .join(" ");
-    const ariaText = scope
-      .flatMap((item) => [item, ...item.querySelectorAll("[aria-label], [title]")])
-      .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
-      .join(" ");
+    const stateText = channelStateText(channelStateScope(node));
     const visibleText = normalizeText(row.textContent || "");
     const style = getComputedStyle(node);
     const weight = Number(style.fontWeight) || 0;
@@ -600,8 +588,8 @@
     );
 
     return (
-      /(^|\s)(modeUnread|unread|unreadImportant|mentionsBadge|numberBadge|newMessages)(\s|$)/i.test(classText) ||
-      /\b(unread|mention|mentions|new messages)\b/i.test(ariaText) ||
+      /(^|\s)(modeUnread|unread|unreadImportant|mentionsBadge|numberBadge|newMessages)(\s|$)/i.test(stateText.classText) ||
+      /\b(unread|mention|mentions|new messages)\b/i.test(stateText.ariaText) ||
       /\b\d{1,4}\s+(unread|mentions?)\b/i.test(visibleText) ||
       (weight >= 600 && !selected)
     );
@@ -636,6 +624,16 @@
     const row = channelRowFor(node);
     if (!scope.includes(row)) scope.push(row);
     return scope;
+  }
+
+  function channelStateText(scope) {
+    const allNodes = scope.flatMap((item) => [item, ...item.querySelectorAll("*")]);
+    return {
+      classText: allNodes.map((item) => classNameOf(item)).join(" "),
+      ariaText: allNodes
+        .map((item) => `${item.getAttribute("aria-label") || ""} ${item.getAttribute("title") || ""}`)
+        .join(" ")
+    };
   }
 
   function classNameOf(node) {
