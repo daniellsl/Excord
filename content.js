@@ -266,9 +266,11 @@
     const id = messageIdForNode(node);
     const authorNode = findMessageAuthorNode(node);
     const timeNode = pick(node, ["time[datetime]", "time"]);
-    const contentNode = pick(node, ['[id^="message-content-"]', '[class*="messageContent"]']);
+    const contentNode = findMessageContentNode(node, id);
     const avatar = pick(node, ['img[class*="avatar"]', 'img[alt*="avatar"]']);
-    const attachmentNodes = [...node.querySelectorAll('a[href], img[src], video source[src], audio source[src]')];
+    const attachmentNodes = [...node.querySelectorAll('a[href], img[src], video source[src], audio source[src]')].filter(
+      (item) => !isReplyPreviewNode(item)
+    );
     const attachments = attachmentNodes
       .map((item) => attachmentFromNode(item))
       .filter((attachment, index, list) => attachment.url && list.findIndex((other) => other.url === attachment.url) === index);
@@ -277,7 +279,7 @@
       .filter(Boolean);
 
     const timestamp = timeNode?.getAttribute("datetime") || inferTimestampFromSnowflake(id);
-    const text = normalizeText(contentNode?.innerText || node.querySelector('[class*="markup"]')?.innerText || "");
+    const text = normalizeText(contentNode?.innerText || "");
     if (!text && attachments.length === 0 && !timestamp) return null;
 
     const explicitAuthor = normalizeText(authorNode?.textContent || "");
@@ -500,16 +502,27 @@
   }
 
   function messageIdForNode(node) {
-    const contentId = node.querySelector(SELECTORS.messageContent)?.id || "";
+    const rawId = node.id || node.getAttribute("data-list-item-id") || "";
+    const rawSnowflakes = rawId.match(/\d{15,}/g);
+    if (rawSnowflakes?.length) return rawSnowflakes[rawSnowflakes.length - 1];
+
+    const contentId = findMessageContentNode(node)?.id || "";
     const contentSnowflake = contentId.match(/message-content-(\d{15,})/);
     if (contentSnowflake) return contentSnowflake[1];
-    const rawId = node.id || node.getAttribute("data-list-item-id") || "";
-    const snowflakes = `${rawId} ${contentId}`.match(/\d{15,}/g);
-    if (snowflakes?.length) return snowflakes[snowflakes.length - 1];
+
     const timestamp = node.querySelector("time[datetime]")?.getAttribute("datetime") || "";
-    const author = node.querySelector('[class*="username"], h3 span')?.textContent || "";
-    const text = node.querySelector(SELECTORS.messageContentOrMarkup)?.textContent || node.textContent || "";
+    const author = findMessageAuthorNode(node)?.textContent || "";
+    const text = findMessageContentNode(node)?.textContent || node.textContent || "";
     return stableHash(`${timestamp}|${author}|${normalizeText(text)}`);
+  }
+
+  function findMessageContentNode(node, messageId = "") {
+    if (messageId) {
+      const exact = node.querySelector(`#message-content-${CSS.escape(messageId)}`);
+      if (exact && !isReplyPreviewNode(exact)) return exact;
+    }
+
+    return [...node.querySelectorAll(SELECTORS.messageContentOrMarkup)].find((candidate) => !isReplyPreviewNode(candidate)) || null;
   }
 
   function collectVisibleAuthorIdentities(nodes) {
