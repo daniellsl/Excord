@@ -95,14 +95,16 @@
       progress(`Opening ${channel.name}`, Math.round((index / Math.max(1, channels.length)) * 45), allMessages.length, 0, jitter(index));
       await clickAndWait(channel.elementSelector);
       await waitForStableChatList();
-      await scrollToUnreadMarker();
-      const messages = await collectMessagesFromViewport({ unreadOnly: true });
-      grouped[channel.name] = {
-        channel,
-        exportedAt: new Date().toISOString(),
-        messages
-      };
-      allMessages.push(...messages.map((message) => ({ ...message, channelName: channel.name, channelId: channel.id })));
+      const unreadMarker = await scrollToUnreadMarker();
+      const messages = unreadMarker ? await collectMessagesFromViewport({ unreadOnly: true, marker: unreadMarker }) : [];
+      if (messages.length) {
+        grouped[channel.name] = {
+          channel,
+          exportedAt: new Date().toISOString(),
+          messages
+        };
+        allMessages.push(...messages.map((message) => ({ ...message, channelName: channel.name, channelId: channel.id })));
+      }
       await sleep(jitter(index));
     }
 
@@ -166,7 +168,7 @@
     };
   }
 
-  async function collectMessagesFromViewport({ unreadOnly }) {
+  async function collectMessagesFromViewport({ unreadOnly, marker = null }) {
     const scroller = findMessageScroller();
     const messages = new Map();
     let reachedBottom = false;
@@ -175,7 +177,7 @@
     while (!reachedBottom && passes < 80) {
       await waitWhilePaused();
       if (cancelled) break;
-      for (const message of parseVisibleMessages()) {
+      for (const message of parseVisibleMessages({ marker })) {
         if (!unreadOnly || message.isAfterUnreadMarker) messages.set(message.id, message);
       }
       reachedBottom = scrollNewer(scroller);
@@ -185,13 +187,13 @@
     return [...messages.values()].sort(compareMessages);
   }
 
-  function parseVisibleMessages() {
+  function parseVisibleMessages({ marker = null } = {}) {
     const nodes = document.querySelectorAll('[id^="chat-messages-"], [data-list-item-id^="chat-messages___chat-messages-"]');
-    return [...nodes].map(parseMessageNode).filter(Boolean);
+    return [...nodes].map((node) => parseMessageNode(node, { marker })).filter(Boolean);
   }
 
-  function parseMessageNode(node) {
-    const id = node.id || node.getAttribute("data-list-item-id") || stableHash(node.textContent || "");
+  function parseMessageNode(node, { marker = null } = {}) {
+    const id = messageIdForNode(node);
     const authorNode = pick(node, ['[class*="username"]', '[data-slate-node="element"] strong', 'h3 span']);
     const timeNode = pick(node, ["time[datetime]", "time"]);
     const contentNode = pick(node, ['[id^="message-content-"]', '[class*="messageContent"]']);
@@ -219,7 +221,7 @@
       embeds: collectEmbeds(node),
       reactions,
       isSystem: Boolean(node.querySelector('[class*="systemMessage"]')),
-      isAfterUnreadMarker: isAfterUnreadMarker(node),
+      isAfterUnreadMarker: isAfterUnreadMarker(node, marker),
       permalink: location.href
     };
   }
@@ -297,6 +299,7 @@
     const marker = findUnreadMarker();
     if (marker) marker.scrollIntoView({ block: "center" });
     await sleep(600);
+    return marker;
   }
 
   function findUnreadMarker() {
@@ -360,19 +363,30 @@
       .filter((embed) => embed.text || embed.url);
   }
 
-  function isAfterUnreadMarker(node) {
-    const marker = findUnreadMarker();
-    if (!marker) return true;
-    const position = marker.compareDocumentPosition(node);
+  function isAfterUnreadMarker(node, marker = null) {
+    const unreadMarker = marker || findUnreadMarker();
+    if (!unreadMarker) return false;
+    const position = unreadMarker.compareDocumentPosition(node);
     if (position & Node.DOCUMENT_POSITION_FOLLOWING) return true;
 
     let current = node;
     while (current?.previousElementSibling) {
       current = current.previousElementSibling;
-      if (current === marker || current.contains(marker)) return true;
+      if (current === unreadMarker || current.contains(unreadMarker)) return true;
       if (/new messages|unread/i.test(`${current.getAttribute("aria-label") || ""} ${current.textContent || ""}`)) return true;
     }
     return false;
+  }
+
+  function messageIdForNode(node) {
+    const rawId = node.id || node.getAttribute("data-list-item-id") || "";
+    const contentId = node.querySelector('[id^="message-content-"]')?.id || "";
+    const snowflake = `${rawId} ${contentId}`.match(/(\d{15,})/);
+    if (snowflake) return snowflake[1];
+    const timestamp = node.querySelector("time[datetime]")?.getAttribute("datetime") || "";
+    const author = node.querySelector('[class*="username"], h3 span')?.textContent || "";
+    const text = node.querySelector('[id^="message-content-"], [class*="messageContent"]')?.textContent || node.textContent || "";
+    return stableHash(`${timestamp}|${author}|${normalizeText(text)}`);
   }
 
   function extractAuthorId(node) {
